@@ -19,6 +19,7 @@ export const state = {
     startIterations: 1,
     uniqueID: 0,
     isInit: 0,
+    time: 0,
     maxIterations: 9,
     vertexShader: 0,
     

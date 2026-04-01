@@ -37,6 +37,7 @@ export function RenderShader(code)
     let shaderProgramCode = 
         "precision mediump float;"+
         `const vec3 iResolution = vec3(${state.canvas_shader.width},${state.canvas_shader.height},0.);`+
+        `uniform float iTime;`+
         code+
         `\nvoid main(){mainImage(gl_FragColor,gl_FragCoord.xy);gl_FragColor.a=1.;}`
     x.shaderSource(pixelShader, shaderProgramCode)
@@ -68,5 +69,9 @@ export function RenderShader(code)
     // render
     x.viewport(0, 0, state.canvas_shader.width, state.canvas_shader.height);
     x.useProgram(shaderProgram);
+
+    state.time = performance.now() / 1000;
+    x.uniform1f(x.getUniformLocation(shaderProgram, 'iTime'), state.time);
+
     x.drawArrays(x.TRIANGLE_FAN, 0, 3);
 }
