@@ -1,4 +1,5 @@
 import { RandInt, RandBetween, Rand, ShuffleArray } from "../utils/math";
+import { SHADER_LIB_NAMES } from "./ShaderLibrary";
 
 export const shaderRandomizer = {
   AssignmentOperator: function () {
@@ -8,31 +9,18 @@ export const shaderRandomizer = {
   FunctionName: function () {
     if (Rand() < 0.5) return "";
 
-    let f = [
-      "sin",
-      "cos",
+    // Built-in GLSL functions that need no stdlib wrapper
+    const builtins = [
+      "sin", "cos", "tan",
+      "atan", "exp", "exp2",
+      "fract", "abs", "sign",
+      "floor", "ceil",
       "normalize",
-      "lengthA",
-      "tan",
-      "asinA",
-      "acosA",
-      "atan",
-      "logA",
-      "log2A",
-      "exp",
-      "exp2",
-      "sqrtA",
-      "inversesqrtA",
-      "fract",
-      "abs",
-      "sign",
-      "floor",
-      "ceil",
-      "pow2",
-      "pow3",
-      "iTime",
     ];
-    return f[RandInt(f.length)];
+
+    // All stdlib wrappers defined in ShaderLibrary
+    const all = [...builtins, ...SHADER_LIB_NAMES];
+    return all[RandInt(all.length)];
   },
   Output: function () {
     let f = ["a", "b"];

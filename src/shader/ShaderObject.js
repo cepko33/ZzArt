@@ -1,6 +1,7 @@
 import { state } from '../state';
 import { Rand, RandInt, RandBetween, RandSeeded, Clamp, Vector3 } from '../utils/math';
 import { ShaderStatement } from './ShaderStatement';
+import { buildPreamble, collectUsedLibNames } from './ShaderLibrary';
 import { RenderShader } from '../webgl';
 
 export class ShaderObject
@@ -24,6 +25,7 @@ export class ShaderObject
         this.uvScaleY = 1;
         this.rotate = 0;
         this.usePalette = 0;
+        this.useTimeInLibrary = 0;
         this.paletteColors = [new Vector3(), new Vector3(), new Vector3(), new Vector3()];
         this.saveListIndex = -1;
         this.uniqueID=++state.uniqueID;
@@ -53,6 +55,7 @@ export class ShaderObject
             statementCount = 0;
         
         this.usePalette = 1;
+        this.useTimeInLibrary = Rand() < 0.5 ? 1 : 0;
         this.hueOffset = Rand();
         this.hueScale = RandBetween(-1,1);
         this.saturationScale = Rand();
@@ -173,67 +176,67 @@ export class ShaderObject
             
         if (Rand() < .1)
             this.iterationCount += RandInt(3)-1;
+        
+        // occasionally flip the timed-library flag for extra variety
+        if (Rand() < .15)
+            this.useTimeInLibrary = this.useTimeInLibrary ? 0 : 1;
             
         this.MakeAllObjectFloatsFixed(this);
     }
     
     GetCode() 
     {
-        let s = 10;
-        let uvsx = (s*this.uvScaleX).toFixed(3);
-        let uvsy = (s*this.uvScaleY).toFixed(3);
-        let uvox = (s*this.uvOffsetX).toFixed(3);
-        let uvoy = (s*this.uvOffsetY).toFixed(3);
-        
-        let code = ``;
-        code += `// ZzArt - ${this.GetGenerationString()}\n\n`;
-        code += `const float PI=3.141592653589793;\n`;
-        if (this.usePalette)
-            code += `vec3 CosinePalette( float t, vec3 a, vec3 b, vec3 c, vec3 d ) { return a + b*cos( PI*2.*(c*t+d)); }\n`;
-        else
-            code += `vec3 SmoothHSV(vec3 c) { vec3 rgb = clamp(abs(mod(c.x*6.+vec3(0,4,2),6.)-3.)-1.,0.,1.); return c.z * mix( vec3(1), rgb*rgb*(3.-2.*rgb), c.y); }\n`
-        code += `vec4 lengthA(vec4 a)      { return vec4(length(a)); }\n`;
-        code += `vec4 asinA(vec4 a)        { return asin(clamp(a,-1.,1.)); }\n`;
-        code += `vec4 acosA(vec4 a)        { return acos(clamp(a,-1.,1.)); }\n`;
-        code += `vec4 logA(vec4 a)         { return log(abs(a)); }\n`;
-        code += `vec4 log2A(vec4 a)        { return log2(abs(a)); }\n`;
-        code += `vec4 sqrtA(vec4 a)        { return sqrt(abs(a)); }\n`;
-        code += `vec4 inversesqrtA(vec4 a) { return inversesqrt(abs(a)); }\n`;
-        code += `vec4 pow2(vec4 a)         { return a*a; }\n`;
-        code += `vec4 pow3(vec4 a)         { return a*a*a; }\n\n`;
+        const s = 10;
+        const uvsx = (s * this.uvScaleX).toFixed(3);
+        const uvsy = (s * this.uvScaleY).toFixed(3);
+        const uvox = (s * this.uvOffsetX).toFixed(3);
+        const uvoy = (s * this.uvOffsetY).toFixed(3);
+        const useTimeInLib = !!this.useTimeInLibrary;
+
+        // ── Preamble ────────────────────────────────────────────────────────
+        const usedNames = collectUsedLibNames(this.shaderStatements);
+        let code = `// ZzArt - ${this.GetGenerationString()}\n`;
+        if (useTimeInLib) code += `// (library time-mode enabled)\n`;
+        code += `\n`;
+        code += buildPreamble(usedNames, this.usePalette, useTimeInLib);
+
+        // ── Main body ───────────────────────────────────────────────────────
+        const rotateSwizzle = state.rotateCanvas ^ this.rotate ? 'yxyx' : 'xyxy';
         code += `void mainImage(out vec4 a, in vec2 p)\n{\n`;
-        let rotateSwizzle = state.rotateCanvas^this.rotate? 'yxyx' : 'xyxy';
-        code += `a=p.${rotateSwizzle}/iResolution.${rotateSwizzle};\n`;
+        code += `a = p.${rotateSwizzle} / iResolution.${rotateSwizzle};\n`;
         code += `a.xywz *= vec2(${uvsx}, ${uvsy}).xyxy;\n`;
         code += `a.xywz += vec2(${uvox}, ${uvoy}).xyxy;\n`;
         code += `vec4 b = a;\n\n`;
-        code += `// Generated Code - Line Count: ${this.shaderStatements.length}\n`
-        
-        if (this.shaderStatements.length == 0)
-            code += `b=a=vec4(0.0);\n`;
+        code += `// Generated statements: ${this.shaderStatements.length}\n`;
+
+        if (this.shaderStatements.length === 0)
+        {
+            code += `b = a = vec4(0.0);\n`;
+        }
         else
         {
             if (this.iterationCount > 1)
-                code += `for (int i = 0; i < ${this.iterationCount}; ++i)\n{\n`
-            for(let statement of this.shaderStatements)
+                code += `for (int i = 0; i < ${this.iterationCount}; ++i) {\n`;
+            for (const statement of this.shaderStatements)
                 code += statement.GetString() + '\n';
             if (this.iterationCount > 1)
-                code += `}\n`
+                code += `}\n`;
         }
-        // use hsl color
+
+        // ── Colorization ────────────────────────────────────────────────────
         if (this.usePalette)
         {
-            code += `\n// Cosine palettes by iq\n`
-            code += `a.x = a.x * ${(this.hueScale*.1).toFixed(3)}+${this.hueOffset.toFixed(3)};\n`
-            code += `a.xyz = b.x * CosinePalette(a.x`
-            for(let color of this.paletteColors)
-                code += `,\n ${color.GetShaderCode()}`;
+            code += `\n// Cosine palettes by iq\n`;
+            code += `a.x = a.x * ${(this.hueScale * .1).toFixed(3)} + ${this.hueOffset.toFixed(3)};\n`;
+            code += `a.xyz = b.x * CosinePalette(a.x`;
+            for (const color of this.paletteColors)
+                code += `,\n    ${color.GetShaderCode()}`;
             code += `);\n`;
         }
         else
         {
-            code += `\n// Smooth HSV by iq\n`
-            code += `a.x = a.x * ${this.hueScale.toFixed(3)}+${this.hueOffset.toFixed(3)};\n`;
+            code += `\n// Smooth HSV by iq\n`;
+            code += `a.x = a.x * ${this.hueScale.toFixed(3)} + ${this.hueOffset.toFixed(3)};\n`;
             code += `a.y *= ${this.saturationScale.toFixed(3)};\n`;
             code += `a.xyz = SmoothHSV(a.xyz);\n`;
         }
