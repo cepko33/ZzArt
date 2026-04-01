@@ -1,7 +1,8 @@
 import { state } from './state';
 import { ShaderObject } from './shader/ShaderObject';
-import { UpdateUI, DrawShaders, SetFavoriteFromMemory, DisplaySaveListPage } from './ui/ui';
+import { UpdateUI, DrawShaders, SetFavoriteFromMemory, DisplaySaveListPage, SetGridSize } from './ui/ui';
 import download from './utils/download';
+import { setCookie, getCookie } from './utils/cookie';
 
 export function SaveLocalStorage()
 {
@@ -34,6 +35,53 @@ export function LoadLocalStorage()
     
     let rawObject = saveData.favorite;
     state.favoriteShader = Object.assign(new ShaderObject(), rawObject).Clone();
+}
+
+export function SaveSettingsToCookie()
+{
+    if (state.satelliteMode)
+        return;
+
+    let settings = {
+        showWatermark: state.checkbox_showWatermark.checked,
+        feedbackClear: state.checkbox_feedbackClear.checked,
+        saveScale: state.input_saveScale.value,
+        gridSize: state.input_gridSize.value,
+        startIterations: state.input_startIterations.value,
+        advancedMode: state.advancedMode
+    };
+
+    setCookie('zzart_settings', JSON.stringify(settings), 365);
+}
+
+export function LoadSettingsFromCookie()
+{
+    let cookie = getCookie('zzart_settings');
+    if (!cookie) return;
+
+    try {
+        let settings = JSON.parse(cookie);
+        if (settings.showWatermark !== undefined) state.checkbox_showWatermark.checked = settings.showWatermark;
+        if (settings.feedbackClear !== undefined) {
+            state.checkbox_feedbackClear.checked = settings.feedbackClear;
+            state.feedbackClearOnChange = settings.feedbackClear;
+        }
+        if (settings.saveScale !== undefined) state.input_saveScale.value = settings.saveScale;
+        if (settings.gridSize !== undefined) {
+            state.input_gridSize.value = settings.gridSize;
+            state.gridSize = parseInt(settings.gridSize);
+        }
+        if (settings.startIterations !== undefined) {
+            state.input_startIterations.value = settings.startIterations;
+            state.startIterations = parseInt(settings.startIterations);
+        }
+        if (settings.advancedMode !== undefined) {
+            state.advancedMode = settings.advancedMode;
+            // advancedMode toggle usually handled by ButtonAdvanced, but we'll apply it here
+        }
+    } catch (e) {
+        console.error("Failed to parse settings cookie", e);
+    }
 }
 
 export function LoadSavedShaderList()

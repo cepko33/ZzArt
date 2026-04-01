@@ -1,7 +1,7 @@
 import { state } from '../state';
 import { Rand, RandInt, RandSeeded, HashString, Clamp, IsMobile, Vector3 } from '../utils/math';
 import { ShaderObject } from '../shader/ShaderObject';
-import { AddToSaveList, DeleteSelectedSave, ExportSaveList, SaveLocalStorage } from '../storage';
+import { AddToSaveList, DeleteSelectedSave, ExportSaveList, SaveLocalStorage, SaveSettingsToCookie } from '../storage';
 import download from '../utils/download';
 import { JSONCrush } from '../utils/jsonCrush';
 import { ClearFeedback } from '../webgl';
@@ -240,6 +240,7 @@ export function ButtonSeed()
 export function ButtonAdvanced()
 {
     state.advancedMode = !state.advancedMode;
+    SaveSettingsToCookie();
     UpdateUI();
 }
 

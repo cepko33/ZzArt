@@ -2,7 +2,7 @@ import { state } from './state';
 import { RandSeeded, IsMobile } from './utils/math';
 import { InitWebgl, ClearFeedback } from './webgl';
 import { ShaderObject } from './shader/ShaderObject';
-import { LoadLocalStorage, LoadSavedShaderList, DeleteSelectedSave, ExportSaveList, ImportSaveList, SelectSavedShader } from './storage';
+import { LoadLocalStorage, LoadSavedShaderList, DeleteSelectedSave, ExportSaveList, ImportSaveList, SelectSavedShader, LoadSettingsFromCookie, SaveSettingsToCookie } from './storage';
 import { InitSatelliteMode, SetFavoriteFromMemory, TryToRotate, DrawShaders, UpdateUI, ChangeMemoryLocation, ButtonTogglePreview, ButtonToggleFeedback, ButtonSave, DisplaySaveListPage, ButtonRandomize, ButtonShare, ButtonSeed, ButtonSatellite, ButtonAdvanced, ButtonHelp, SetGridSize, OpenCapJS, SetBest, ButtonSatelliteHelp } from './ui/ui';
 
 // Map HTML global IDs to window object so inline event handlers in HTML still work
@@ -157,6 +157,21 @@ function Init()
     state.span_feedbackSharpen         = document.getElementById('span_feedbackSharpen');
     state.range_feedbackBlur           = document.getElementById('range_feedbackBlur');
     state.span_feedbackBlur            = document.getElementById('span_feedbackBlur');
+    
+    state.checkbox_showWatermark.onchange = SaveSettingsToCookie;
+    state.checkbox_feedbackClear.onchange = (e) => {
+        state.feedbackClearOnChange = e.target.checked;
+        SaveSettingsToCookie();
+    };
+    state.input_saveScale.onchange = SaveSettingsToCookie;
+    state.input_gridSize.onchange = (e) => {
+        SetGridSize(e.target.value);
+        SaveSettingsToCookie();
+    };
+    state.input_startIterations.onchange = (e) => {
+        state.startIterations = parseInt(e.target.value);
+        SaveSettingsToCookie();
+    };
 
     state.canvasContext_main = state.canvas_main.getContext('2d');
     state.canvasContext_save = state.canvas_save.getContext('2d');
@@ -260,6 +275,7 @@ function Init()
     
     LoadLocalStorage();
     LoadSavedShaderList();
+    LoadSettingsFromCookie();
     
     for(let i=0; i<state.gridSize; i++)
         state.shaderGrid[i] = [];
