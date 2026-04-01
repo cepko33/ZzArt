@@ -1,5 +1,7 @@
 import { state } from './state';
 
+const programCache = {};
+
 export function InitWebgl() 
 {
     let x = state.canvasContext_shader;
@@ -32,38 +34,45 @@ export function RenderShader(code)
     
     // create pixel shader
     let x = state.canvasContext_shader;
-    let shaderProgram = x.createProgram();
-    let pixelShader = x.createShader(x.FRAGMENT_SHADER)
     let shaderProgramCode = 
         "precision mediump float;"+
         `const vec3 iResolution = vec3(${state.canvas_shader.width},${state.canvas_shader.height},0.);`+
         `uniform float iTime;`+
         code+
         `\nvoid main(){mainImage(gl_FragColor,gl_FragCoord.xy);gl_FragColor.a=1.;}`
-    x.shaderSource(pixelShader, shaderProgramCode)
-    x.compileShader(pixelShader);
-    
-    // check for errors
-    let debugOutput="";
-    let compiled = x.getShaderParameter(pixelShader, x.COMPILE_STATUS);
-    let shaderLog = x.getShaderInfoLog(pixelShader);
-    state.textarea_debug.value = compiled? "" : "FRAGMENT SHADER ERROR!\n" + shaderLog;
-    if (!compiled)
+        
+    let shaderProgram = programCache[shaderProgramCode];
+    if (!shaderProgram)
     {
-        shaderProgram = 0;
-        return;
-    }
+        shaderProgram = x.createProgram();
+        let pixelShader = x.createShader(x.FRAGMENT_SHADER)
+        x.shaderSource(pixelShader, shaderProgramCode)
+        x.compileShader(pixelShader);
+        
+        // check for errors
+        let debugOutput="";
+        let compiled = x.getShaderParameter(pixelShader, x.COMPILE_STATUS);
+        let shaderLog = x.getShaderInfoLog(pixelShader);
+        state.textarea_debug.value = compiled? "" : "FRAGMENT SHADER ERROR!\n" + shaderLog;
+        if (!compiled)
+        {
+            shaderProgram = 0;
+            return;
+        }
 
-    // link program
-    x.attachShader(shaderProgram,state.vertexShader);
-    x.attachShader(shaderProgram, pixelShader);
-    x.linkProgram(shaderProgram);
-    let linkGood = x.getProgramParameter(shaderProgram, x.LINK_STATUS);
-    if (!linkGood)
-    {
-        // something went wrong with the link
-        state.textarea_debug.value = "LINK ERROR!\n" + x.getProgramInfoLog(shaderProgram);
-        return;
+        // link program
+        x.attachShader(shaderProgram,state.vertexShader);
+        x.attachShader(shaderProgram, pixelShader);
+        x.linkProgram(shaderProgram);
+        let linkGood = x.getProgramParameter(shaderProgram, x.LINK_STATUS);
+        if (!linkGood)
+        {
+            // something went wrong with the link
+            state.textarea_debug.value = "LINK ERROR!\n" + x.getProgramInfoLog(shaderProgram);
+            return;
+        }
+        
+        programCache[shaderProgramCode] = shaderProgram;
     }
     
     // render

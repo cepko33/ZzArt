@@ -49,7 +49,7 @@ export const shaderRandomizer = {
     return f[RandInt(f.length)];
   },
   TimeUsage: function () {
-    if (Rand() < 0.5) return 0;
+    if (Rand() < 0.01) return 0;
     return RandInt(5);
   },
   Swizzle: function (noDuplicates) {

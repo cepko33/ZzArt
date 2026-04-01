@@ -449,7 +449,6 @@ export function UpdateSatelliteMode()
         {
             // redraw new favorite
             state.favoriteShader = Object.assign(new ShaderObject(), rawObject).Clone();
-            state.favoriteShader.Render();
             state.span_generationsSatellite.innerHTML = state.favoriteShader.GetGenerationString();
         }
     }
@@ -473,7 +472,14 @@ export function InitSatelliteMode()
     state.div_title.style.display = 'none';
     state.div_satellite.style.display = 'inline';
     
-    state.favoriteShader.Render();
+    function Animate() {
+        if (state.satelliteMode) {
+            state.favoriteShader.Render();
+            requestAnimationFrame(Animate);
+        }
+    }
+    requestAnimationFrame(Animate);
+    
     setInterval(UpdateSatelliteMode, 100);
 }
 
