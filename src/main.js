@@ -55,6 +55,11 @@ function UpdateFeedbackUI()
     state.favoriteShader.feedbackModAmount  = modAmount;
     state.favoriteShader.feedbackOpOrder    = opOrder;
     state.favoriteShader.feedbackSwap       = doSwap;
+    state.favoriteShader.feedbackSharpen    = parseFloat(state.range_feedbackSharpen.value);
+    state.favoriteShader.feedbackBlur       = parseFloat(state.range_feedbackBlur.value);
+
+    state.span_feedbackSharpen.textContent  = state.favoriteShader.feedbackSharpen.toFixed(2);
+    state.span_feedbackBlur.textContent     = state.favoriteShader.feedbackBlur.toFixed(2);
 
     // Chroma Key
     let chromaMode      = parseInt(state.select_feedbackChromaMode.value);
@@ -144,6 +149,11 @@ function Init()
     state.range_feedbackChromaSoftness   = document.getElementById('range_feedbackChromaSoftness');
     state.span_feedbackChromaSoftness    = document.getElementById('span_feedbackChromaSoftness');
     state.div_chromaSettings             = document.getElementById('div_chromaSettings');
+
+    state.range_feedbackSharpen        = document.getElementById('range_feedbackSharpen');
+    state.span_feedbackSharpen         = document.getElementById('span_feedbackSharpen');
+    state.range_feedbackBlur           = document.getElementById('range_feedbackBlur');
+    state.span_feedbackBlur            = document.getElementById('span_feedbackBlur');
 
     state.canvasContext_main = state.canvas_main.getContext('2d');
     state.canvasContext_save = state.canvas_save.getContext('2d');

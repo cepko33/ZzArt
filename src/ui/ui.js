@@ -62,6 +62,10 @@ export function UpdateUI(resetSaveListSelection=1)
         state.span_feedbackModAmount.textContent = (fs.feedbackModAmount ?? 0.3).toFixed(2);
         state.select_feedbackOpOrder.value       = fs.feedbackOpOrder    ?? 0;
         state.checkbox_feedbackSwap.checked      = !!fs.feedbackSwap;
+        state.range_feedbackSharpen.value        = fs.feedbackSharpen    ?? 0;
+        state.span_feedbackSharpen.textContent   = (fs.feedbackSharpen   ?? 0).toFixed(2);
+        state.range_feedbackBlur.value           = fs.feedbackBlur       ?? 0;
+        state.span_feedbackBlur.textContent      = (fs.feedbackBlur      ?? 0).toFixed(2);
 
         // Chroma Key Sync
         if (state.select_feedbackChromaMode)

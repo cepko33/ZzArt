@@ -39,6 +39,8 @@ export class ShaderObject
         this.feedbackModAmount = 0.3; // 0-1, modulation strength
         this.feedbackOpOrder = 0;     // 0-5, how mask and modulation are cross-wired
         this.feedbackSwap = 0;        // 0/1, swap curr/prev texture roles before compositing
+        this.feedbackSharpen = 0;     // 0-1, sharpen amount for final feedback pass
+        this.feedbackBlur = 0;        // 0-1, blur amount for final feedback pass
         
         // Chroma Key settings
         this.chromaMode = 0;          // 0 RGB, 1 Hue, 2 Sat, 3 Lum
@@ -104,6 +106,8 @@ export class ShaderObject
             this.feedbackModAmount  = RandBetween(0.1, 0.6);
             this.feedbackOpOrder    = RandInt(6);
             this.feedbackSwap       = Rand() < 0.3 ? 1 : 0;
+            this.feedbackSharpen    = Rand() < 0.15 ? RandBetween(0.1, 0.4) : 0;
+            this.feedbackBlur       = Rand() < 0.15 ? RandBetween(0.1, 0.4) : 0;
             this.chromaMode         = RandInt(4);
             this.chromaKeyColor.Randomize(0, 1);
             this.chromaThreshold    = RandBetween(0.01, 0.2);
@@ -230,6 +234,10 @@ export class ShaderObject
                 this.feedbackOpOrder = RandInt(6);
             if (Rand() < .08)
                 this.feedbackSwap = this.feedbackSwap ? 0 : 1;
+            if (Rand() < .08)
+                this.feedbackSharpen = Clamp(this.feedbackSharpen + RandBetween(-.1, .1), 0, 1);
+            if (Rand() < .08)
+                this.feedbackBlur = Clamp(this.feedbackBlur + RandBetween(-.1, .1), 0, 1);
             if (Rand() < .10)
             {
                 this.chromaMode = RandInt(4);
@@ -325,6 +333,8 @@ export class ShaderObject
                 feedbackModAmount:  this.feedbackModAmount  ?? 0.3,
                 feedbackOpOrder:    this.feedbackOpOrder    ?? 0,
                 feedbackSwap:       this.feedbackSwap       ?? 0,
+                feedbackSharpen:    this.feedbackSharpen    ?? 0,
+                feedbackBlur:       this.feedbackBlur       ?? 0,
                 chromaKeyColor:     this.chromaKeyColor,
                 chromaThreshold:    this.chromaThreshold    ?? 0.1,
                 chromaSoftness:     this.chromaSoftness     ?? 0.1,

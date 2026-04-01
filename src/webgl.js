@@ -216,8 +216,10 @@ export function RenderShader(code, feedbackOpts)
         let compSrc = buildCompositeShader(
             feedbackOpts.feedbackBlendMode,
             feedbackOpts.feedbackMaskType,
-            feedbackOpts.feedbackModType ?? 0,
-            feedbackOpts.feedbackOpOrder  ?? 0,
+            feedbackOpts.feedbackModType    ?? 0,
+            feedbackOpts.feedbackOpOrder    ?? 0,
+            feedbackOpts.feedbackSharpen    ?? 0,
+            feedbackOpts.feedbackBlur       ?? 0,
             w, h
         );
         let compProg = _getOrCreateProgram(x, compSrc);

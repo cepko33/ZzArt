@@ -295,7 +295,10 @@ function _clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
  * @param {number} height     canvas pixel height
  * @returns {string}  Complete GLSL source for the composite fragment shader
  */
-export function buildCompositeShader(blendMode, maskType, modType, opOrder, width, height) {
+export function buildCompositeShader(blendMode, maskType, modType, opOrder, sharpen, blur, width, height) {
+
+  // ... (blendExprs, maskExprs, modKernels, opBodies remain same) ...
+  // (I'll just replace the whole function in the next call or keep it concise)
 
   // ── Blend sub-expression (uses curr, prev, alpha already declared) ────────
   const blendExprs = [
@@ -454,6 +457,29 @@ void main(){
   float dy = 1.0 / ${height}.0;
   float mod_a = iFeedbackModAmount;
 ${body}
+  
+  // Post-processing sharp/blur (applied to current history sample for stability)
+  if (${sharpen.toFixed(3)} > 0.0 || ${blur.toFixed(3)} > 0.0) {
+      vec4 r = gl_FragColor;
+      vec2 d = vec2(dx, dy);
+      
+      // sample neighbors from iPrevious (since we can't sample the 'current' result)
+      // This effectively sharpens the cumulative history result over time.
+      vec4 n = texture2D(iPrevious, clamp(uvp + vec2(0, d.y), 0., 1.)) + 
+               texture2D(iPrevious, clamp(uvp - vec2(0, d.y), 0., 1.)) + 
+               texture2D(iPrevious, clamp(uvp + vec2(d.x, 0), 0., 1.)) + 
+               texture2D(iPrevious, clamp(uvp - vec2(d.x, 0), 0., 1.));
+      
+      r.rgb += (r.rgb - n.rgb * 0.25) * ${sharpen.toFixed(3)} * 4.0;
+      
+      vec4 b = texture2D(iPrevious, clamp(uvp + d, 0., 1.)) + 
+               texture2D(iPrevious, clamp(uvp - d, 0., 1.)) + 
+               texture2D(iPrevious, clamp(uvp + vec2(d.x, -d.y), 0., 1.)) + 
+               texture2D(iPrevious, clamp(uvp - vec2(d.x, d.y), 0., 1.));
+               
+      r.rgb = mix(r.rgb, b.rgb * 0.25, ${blur.toFixed(3)});
+      gl_FragColor = r;
+  }
 }`;
 }
 

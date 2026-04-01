@@ -82,4 +82,10 @@ export const state = {
     range_feedbackChromaSoftness: null,
     span_feedbackChromaSoftness: null,
     div_chromaSettings: null,
+
+    // Post-Proc UI DOM Refs
+    range_feedbackSharpen: null,
+    span_feedbackSharpen: null,
+    range_feedbackBlur: null,
+    span_feedbackBlur: null,
 };
