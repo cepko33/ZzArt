@@ -52,6 +52,13 @@ export class Vector3
         this.y = RandBetween(min,max); 
         this.z = RandBetween(min,max); 
     }
+    set(x, y, z) 
+    { 
+        this.x = x; 
+        this.y = y; 
+        this.z = z; 
+        return this; 
+    }
     
     GetShaderCode() { return `vec3(${this.x.toFixed(3)}, ${this.y.toFixed(3)}, ${this.z.toFixed(3)})`; }
 }

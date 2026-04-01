@@ -2,7 +2,7 @@ import { state } from '../state';
 import { Rand, RandInt, RandBetween, RandSeeded, Clamp, Vector3 } from '../utils/math';
 import { ShaderStatement } from './ShaderStatement';
 import { buildPreamble, collectUsedLibNames } from './ShaderLibrary';
-import { RenderShader } from '../webgl';
+import { RenderShader, ClearFeedback } from '../webgl';
 
 export class ShaderObject
 {
@@ -29,6 +29,22 @@ export class ShaderObject
         this.paletteColors = [new Vector3(), new Vector3(), new Vector3(), new Vector3()];
         this.saveListIndex = -1;
         this.uniqueID=++state.uniqueID;
+        
+        // Feedback / compositing
+        this.useFeedback = 0;
+        this.feedbackBlendMode = 0;   // 0-8, see ShaderLibrary.buildCompositeShader
+        this.feedbackAmount = 0.92;   // 0-1, weight toward previous frame
+        this.feedbackMaskType = 0;    // 0-4, mask type for spatially-varying blend
+        this.feedbackModType = 0;     // 0-4, UV modulation applied to previous-frame sample
+        this.feedbackModAmount = 0.3; // 0-1, modulation strength
+        this.feedbackOpOrder = 0;     // 0-5, how mask and modulation are cross-wired
+        this.feedbackSwap = 0;        // 0/1, swap curr/prev texture roles before compositing
+        
+        // Chroma Key settings
+        this.chromaMode = 0;          // 0 RGB, 1 Hue, 2 Sat, 3 Lum
+        this.chromaKeyColor = new Vector3(0, 1, 0); // Default to green
+        this.chromaThreshold = 0.1;
+        this.chromaSoftness = 0.1;
     }
     
     SetGridPos(X,Y) { this.gridPosX = X; this.gridPosY = Y; }
@@ -76,6 +92,23 @@ export class ShaderObject
         
         for(let color of this.paletteColors)
             color.Randomize(0,1);
+        
+        // Feedback: off by default, 20 % chance to enable
+        this.useFeedback = Rand() < 0.2 ? 1 : 0;
+        if (this.useFeedback)
+        {
+            this.feedbackBlendMode  = RandInt(9);
+            this.feedbackAmount     = RandBetween(0.80, 0.97);
+            this.feedbackMaskType   = RandInt(5);
+            this.feedbackModType    = RandInt(5);
+            this.feedbackModAmount  = RandBetween(0.1, 0.6);
+            this.feedbackOpOrder    = RandInt(6);
+            this.feedbackSwap       = Rand() < 0.3 ? 1 : 0;
+            this.chromaMode         = RandInt(4);
+            this.chromaKeyColor.Randomize(0, 1);
+            this.chromaThreshold    = RandBetween(0.01, 0.2);
+            this.chromaSoftness     = RandBetween(0.01, 0.2);
+        }
             
         this.MakeAllObjectFloatsFixed(this);
     }
@@ -89,6 +122,7 @@ export class ShaderObject
         clone.paletteColors = [];
         for(let color of this.paletteColors)
             clone.paletteColors.push(Object.assign(new Vector3(), color));
+        clone.chromaKeyColor = Object.assign(new Vector3(), this.chromaKeyColor);
             
         // fix old shaders that had too high iterations
         clone.iterationCount = Clamp(parseInt(clone.iterationCount),1,state.maxIterations);
@@ -180,6 +214,32 @@ export class ShaderObject
         // occasionally flip the timed-library flag for extra variety
         if (Rand() < .15)
             this.useTimeInLibrary = this.useTimeInLibrary ? 0 : 1;
+        
+        // Feedback mutations
+        if (Rand() < .08)
+            this.useFeedback = this.useFeedback ? 0 : 1;
+        if (this.useFeedback)
+        {
+            if (Rand() < .15)
+                this.feedbackBlendMode = RandInt(9);
+            if (Rand() < .10)
+                this.feedbackMaskType = RandInt(5);
+            if (Rand() < .10)
+                this.feedbackModType = RandInt(5);
+            if (Rand() < .10)
+                this.feedbackOpOrder = RandInt(6);
+            if (Rand() < .08)
+                this.feedbackSwap = this.feedbackSwap ? 0 : 1;
+            if (Rand() < .10)
+            {
+                this.chromaMode = RandInt(4);
+                this.chromaKeyColor.Randomize(0, 1);
+            }
+            this.feedbackAmount    = Clamp(this.feedbackAmount    + RandBetween(-.05, .05), 0.5, 0.99);
+            this.feedbackModAmount = Clamp(this.feedbackModAmount + RandBetween(-.08, .08), 0.0, 1.0);
+            this.chromaThreshold   = Clamp(this.chromaThreshold   + RandBetween(-.03, .03), 0.0, 1.0);
+            this.chromaSoftness    = Clamp(this.chromaSoftness    + RandBetween(-.03, .03), 0.0, 1.0);
+        }
             
         this.MakeAllObjectFloatsFixed(this);
     }
@@ -206,6 +266,7 @@ export class ShaderObject
         code += `a = p.${rotateSwizzle} / iResolution.${rotateSwizzle};\n`;
         code += `a.xywz *= vec2(${uvsx}, ${uvsy}).xyxy;\n`;
         code += `a.xywz += vec2(${uvox}, ${uvoy}).xyxy;\n`;
+        code += `a.w = 1.0; // Initialize alpha\n`;
         code += `vec4 b = a;\n\n`;
         code += `// Generated statements: ${this.shaderStatements.length}\n`;
 
@@ -244,10 +305,36 @@ export class ShaderObject
         return code;
     }
     
-    Render() 
+    /**
+     * Render this shader.
+     * @param {boolean} [withFeedback=false]  When true, passes feedback
+     *   options to RenderShader so the two-pass composite path is used.
+     *   Grid / thumbnail renders always skip feedback.
+     */
+    Render(withFeedback = false)
     {
         let code = this.GetCode();
-        RenderShader(code);
+        if (withFeedback && this.useFeedback)
+        {
+            RenderShader(code, {
+                useFeedback:        true,
+                feedbackBlendMode:  this.feedbackBlendMode  ?? 0,
+                feedbackAmount:     this.feedbackAmount     ?? 0.92,
+                feedbackMaskType:   this.feedbackMaskType   ?? 0,
+                feedbackModType:    this.feedbackModType    ?? 0,
+                feedbackModAmount:  this.feedbackModAmount  ?? 0.3,
+                feedbackOpOrder:    this.feedbackOpOrder    ?? 0,
+                feedbackSwap:       this.feedbackSwap       ?? 0,
+                chromaKeyColor:     this.chromaKeyColor,
+                chromaThreshold:    this.chromaThreshold    ?? 0.1,
+                chromaSoftness:     this.chromaSoftness     ?? 0.1,
+                chromaMode:         this.chromaMode         ?? 0,
+            });
+        }
+        else
+        {
+            RenderShader(code);
+        }
     }
     
     GetGenerationString(shorten)

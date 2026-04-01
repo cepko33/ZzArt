@@ -1,14 +1,14 @@
 import { state } from './state';
 import { RandSeeded, IsMobile } from './utils/math';
-import { InitWebgl } from './webgl';
+import { InitWebgl, ClearFeedback } from './webgl';
 import { ShaderObject } from './shader/ShaderObject';
 import { LoadLocalStorage, LoadSavedShaderList, DeleteSelectedSave, ExportSaveList, ImportSaveList, SelectSavedShader } from './storage';
-import { InitSatelliteMode, SetFavoriteFromMemory, TryToRotate, DrawShaders, UpdateUI, ChangeMemoryLocation, ButtonTogglePreview, ButtonSave, DisplaySaveListPage, ButtonRandomize, ButtonShare, ButtonSeed, ButtonSatellite, ButtonAdvanced, ButtonHelp, SetGridSize, OpenCapJS, SetBest, ButtonSatelliteHelp } from './ui/ui';
+import { InitSatelliteMode, SetFavoriteFromMemory, TryToRotate, DrawShaders, UpdateUI, ChangeMemoryLocation, ButtonTogglePreview, ButtonToggleFeedback, ButtonSave, DisplaySaveListPage, ButtonRandomize, ButtonShare, ButtonSeed, ButtonSatellite, ButtonAdvanced, ButtonHelp, SetGridSize, OpenCapJS, SetBest, ButtonSatelliteHelp } from './ui/ui';
 
-// Map HTML global IDs to window object so inline event handlers in HTML still work if any are left
-// But it's better to wire them or replace them here.
+// Map HTML global IDs to window object so inline event handlers in HTML still work
 window.ChangeMemoryLocation = ChangeMemoryLocation;
 window.ButtonTogglePreview = ButtonTogglePreview;
+window.ButtonToggleFeedback = ButtonToggleFeedback;
 window.ButtonSave = ButtonSave;
 window.DisplaySaveListPage = DisplaySaveListPage;
 window.ButtonRandomize = ButtonRandomize;
@@ -24,6 +24,67 @@ window.ExportSaveList = ExportSaveList;
 window.DeleteSelectedSave = DeleteSelectedSave;
 window.UpdateUI = UpdateUI;
 window.SelectSavedShader = SelectSavedShader;
+
+/**
+ * Read the feedback controls from the DOM, apply to favoriteShader, and
+ * optionally re-render the preview if it is currently showing.
+ */
+function UpdateFeedbackUI()
+{
+    if (!state.favoriteShader) return;
+
+    let useFeedback   = state.checkbox_useFeedback.checked ? 1 : 0;
+    let blendMode     = parseInt(state.select_feedbackBlendMode.value);
+    let amount        = parseFloat(state.range_feedbackAmount.value);
+    let maskType      = parseInt(state.select_feedbackMaskType.value);
+    let modType       = parseInt(state.select_feedbackModType.value);
+    let modAmount     = parseFloat(state.range_feedbackModAmount.value);
+    let opOrder       = parseInt(state.select_feedbackOpOrder.value);
+    let doSwap        = state.checkbox_feedbackSwap.checked ? 1 : 0;
+    let clearOnChange = state.checkbox_feedbackClear.checked;
+
+    state.span_feedbackAmount.textContent    = amount.toFixed(2);
+    state.span_feedbackModAmount.textContent = modAmount.toFixed(2);
+    state.feedbackClearOnChange = clearOnChange;
+
+    state.favoriteShader.useFeedback        = useFeedback;
+    state.favoriteShader.feedbackBlendMode  = blendMode;
+    state.favoriteShader.feedbackAmount     = amount;
+    state.favoriteShader.feedbackMaskType   = maskType;
+    state.favoriteShader.feedbackModType    = modType;
+    state.favoriteShader.feedbackModAmount  = modAmount;
+    state.favoriteShader.feedbackOpOrder    = opOrder;
+    state.favoriteShader.feedbackSwap       = doSwap;
+
+    // Chroma Key
+    let chromaMode      = parseInt(state.select_feedbackChromaMode.value);
+    let chromaKeyColor  = state.input_feedbackChromaKeyColor.value;
+    let chromaThreshold = parseFloat(state.range_feedbackChromaThreshold.value);
+    let chromaSoftness  = parseFloat(state.range_feedbackChromaSoftness.value);
+
+    state.span_feedbackChromaThreshold.textContent = chromaThreshold.toFixed(2);
+    state.span_feedbackChromaSoftness.textContent  = chromaSoftness.toFixed(2);
+    state.div_chromaSettings.style.display = (maskType === 6) ? 'block' : 'none';
+
+    state.favoriteShader.chromaMode = chromaMode;
+    state.favoriteShader.chromaThreshold = chromaThreshold;
+    state.favoriteShader.chromaSoftness = chromaSoftness;
+    
+    // Hex to RGB conversion
+    const r = parseInt(chromaKeyColor.slice(1, 3), 16) / 255;
+    const g = parseInt(chromaKeyColor.slice(3, 5), 16) / 255;
+    const b = parseInt(chromaKeyColor.slice(5, 7), 16) / 255;
+    state.favoriteShader.chromaKeyColor.set(r, g, b);
+
+    // If feedback was just turned on, clear stale accumulation
+    if (useFeedback && clearOnChange)
+        ClearFeedback();
+
+    // Re-render live if preview is showing
+    if (state.showPreview && state.favoriteShader.IsVariation())
+        state.favoriteShader.Render(true);
+}
+window.UpdateFeedbackUI = UpdateFeedbackUI;
 
 function Init()
 {
@@ -60,6 +121,29 @@ function Init()
     state.input_importFile = document.getElementById('input_importFile');
     state.textarea_code = document.getElementById('textarea_code');
     state.textarea_json = document.getElementById('textarea_json');
+
+    // Feedback UI controls
+    state.checkbox_useFeedback       = document.getElementById('checkbox_useFeedback');
+    state.select_feedbackBlendMode   = document.getElementById('select_feedbackBlendMode');
+    state.range_feedbackAmount       = document.getElementById('range_feedbackAmount');
+    state.span_feedbackAmount        = document.getElementById('span_feedbackAmount');
+    state.select_feedbackMaskType    = document.getElementById('select_feedbackMaskType');
+    state.select_feedbackModType     = document.getElementById('select_feedbackModType');
+    state.range_feedbackModAmount    = document.getElementById('range_feedbackModAmount');
+    state.span_feedbackModAmount     = document.getElementById('span_feedbackModAmount');
+    state.select_feedbackOpOrder     = document.getElementById('select_feedbackOpOrder');
+    state.checkbox_feedbackSwap      = document.getElementById('checkbox_feedbackSwap');
+    state.checkbox_feedbackClear     = document.getElementById('checkbox_feedbackClear');
+    state.button_feedback            = document.getElementById('button_feedback');
+    state.button_satelliteFeedback   = document.getElementById('button_satelliteFeedback');
+
+    state.select_feedbackChromaMode      = document.getElementById('select_feedbackChromaMode');
+    state.input_feedbackChromaKeyColor   = document.getElementById('input_feedbackChromaKeyColor');
+    state.range_feedbackChromaThreshold  = document.getElementById('range_feedbackChromaThreshold');
+    state.span_feedbackChromaThreshold   = document.getElementById('span_feedbackChromaThreshold');
+    state.range_feedbackChromaSoftness   = document.getElementById('range_feedbackChromaSoftness');
+    state.span_feedbackChromaSoftness    = document.getElementById('span_feedbackChromaSoftness');
+    state.div_chromaSettings             = document.getElementById('div_chromaSettings');
 
     state.canvasContext_main = state.canvas_main.getContext('2d');
     state.canvasContext_save = state.canvas_save.getContext('2d');
@@ -113,6 +197,8 @@ function Init()
                 ButtonTogglePreview();
             used = 1;
         }
+        else if (e.keyCode == 70) // F
+            ButtonToggleFeedback(), used = 1;
         else if (e.keyCode == 83) // S
             ButtonSave(), used = 1;
         else if (e.keyCode == 90) // Z

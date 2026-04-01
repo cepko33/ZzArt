@@ -63,5 +63,23 @@ export const state = {
     
     // Rand context
     randSeedString: '',
-    randSeed: Date.now()
+    randSeed: Date.now(),
+
+    // Feedback / compositing (ping-pong framebuffers)
+    feedbackFramebuffers: [null, null, null],  // [raw, historyA, historyB] WebGLFramebuffer
+    feedbackTextures: [null, null, null],      // colour attachments
+    feedbackIndex: 0,                    // which slot is "previous"
+    feedbackCanvasWidth: 0,             // last size; triggers FB resize
+    feedbackCanvasHeight: 0,
+    feedbackClearOnChange: true,        // when true, clear accum on shader change
+    feedbackCompositeProgram: null,     // cached WebGL program for composite pass
+
+    // Chroma Key UI DOM Refs
+    select_feedbackChromaMode: null,
+    input_feedbackChromaKeyColor: null,
+    range_feedbackChromaThreshold: null,
+    span_feedbackChromaThreshold: null,
+    range_feedbackChromaSoftness: null,
+    span_feedbackChromaSoftness: null,
+    div_chromaSettings: null,
 };

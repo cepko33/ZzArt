@@ -269,3 +269,192 @@ export function buildPreamble(usedNames, usePalette, useTimeInLib) {
   out += '\n';
   return out;
 }
+
+// ── Inline Clamp used only within this module ─────────────────────────────
+function _clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+
+/**
+ * Build the hardcoded composite fragment shader for the feedback pass.
+ *
+ * blendMode, maskType, modType, and opOrder are all inlined as literal GLSL
+ * — no runtime branches — so GPU workload is minimal.
+ *
+ * @param {number} blendMode  0–7   blend operation for current vs previous
+ * @param {number} maskType   0–4   spatially-varying alpha mask source
+ * @param {number} modType    0–4   UV modulation applied to iPrevious sample:
+ *                                    0 None, 1 Distort, 2 Displace-noise,
+ *                                    3 Scale, 4 Rotate
+ * @param {number} opOrder    0–5   how mask and modulation are cross-wired:
+ *                                    0 Standard   – mod UV → sample → mask(curr) → blend
+ *                                    1 Mask-gate  – mask(curr) first → scales mod_a → mod UV → blend
+ *                                    2 Inv-gate   – (1-mask) scales mod_a → stronger in dark areas
+ *                                    3 Warp-then-mask – mod UV → sample warped → mask(curr,prevW) → blend
+ *                                    4 Mask-steers-UV – mask drives UV offset direction (attraction)
+ *                                    5 Mod-vs-amount  – mod_a trades off against iFeedbackAmount
+ * @param {number} width      canvas pixel width  (baked into iResolution)
+ * @param {number} height     canvas pixel height
+ * @returns {string}  Complete GLSL source for the composite fragment shader
+ */
+export function buildCompositeShader(blendMode, maskType, modType, opOrder, width, height) {
+
+  // ── Blend sub-expression (uses curr, prev, alpha already declared) ────────
+  const blendExprs = [
+    /* 0 Mix        */ `mix(curr, prev, alpha)`,
+    /* 1 Additive   */ `clamp(prev * alpha + curr, 0., 1.)`,
+    /* 2 Multiply   */ `clamp(prev * curr + curr * (1. - alpha), 0., 1.)`,
+    /* 3 Screen     */ `clamp(1. - (1. - prev) * (1. - curr) * alpha, 0., 1.)`,
+    /* 4 Difference */ `clamp(abs(prev - curr) * alpha + curr * (1. - alpha), 0., 1.)`,
+    /* 5 Lighten    */ `clamp(max(prev, curr) * alpha + curr * (1. - alpha), 0., 1.)`,
+    /* 6 Darken     */ `clamp(min(prev, curr) * alpha + curr * (1. - alpha), 0., 1.)`,
+    /* 7 Burn       */ `clamp(1. - (1. - prev * alpha) / (curr + 0.001), 0., 1.)`,
+    /* 8 Atop       */ `clamp(curr + prev * (1.0 - dot(curr.rgb, vec3(0.299,0.587,0.114))) * alpha, 0., 1.)`,
+  ];
+  const blendExpr = blendExprs[_clamp(blendMode, 0, blendExprs.length - 1)];
+
+  // ── Mask sub-expression ────────────────────────────────────────────────────
+  // Requires curr and prev already declared. Edge mask needs dx/dy.
+  const maskExprs = [
+    /* 0 None      */ `1.0`,
+    /* 1 Luminance */ `dot(curr.rgb, vec3(0.299, 0.587, 0.114))`,
+    /* 2 Red ch.   */ `curr.r`,
+    /* 3 Edge      */ `clamp((abs(texture2D(iCurrent,uv+vec2(dx,0.)).r-texture2D(iCurrent,uv-vec2(dx,0.)).r)+abs(texture2D(iCurrent,uv+vec2(0.,dy)).r-texture2D(iCurrent,uv-vec2(0.,dy)).r))*8.0,0.,1.)`,
+    /* 4 Hue dist  */ `clamp(distance(curr.rgb, prev.rgb) * 3.0, 0., 1.)`,
+    /* 5 Alpha     */ `curr.a`,
+    /* 6 Chroma    */ `calcChroma(curr.rgb, iChromaKeyColor, iChromaThreshold, iChromaSoftness, iChromaMode)`,
+  ];
+  const maskExpr = maskExprs[_clamp(maskType, 0, maskExprs.length - 1)];
+
+  // ── UV modulation kernel (outputs `uvp`, reads `mod_a`, `uv`, `iTime`) ────
+  // We use a function-like template so each opOrder can adjust mod_a first.
+  const modKernels = [
+    /* 0 None     */ (m) => `vec2 uvp = uv;`,
+    /* 1 Distort  */ (m) => `vec2 uvp = uv + sin(uv.yx*6.2831853+iTime*0.5)*${m}*0.04;`,
+    /* 2 Displace */ (m) => `vec2 _h=fract(sin(vec2(dot(uv,vec2(127.1,311.7)),dot(uv,vec2(269.5,183.3))))*43758.547);\n  vec2 uvp=uv+(_h-0.5)*${m}*0.06;`,
+    /* 3 Scale    */ (m) => `vec2 uvp=(uv-0.5)*(1.0-${m}*0.03)+0.5;`,
+    /* 4 Rotate   */ (m) => `float _ang=${m}*0.06;float _s=sin(_ang),_c=cos(_ang);vec2 _off=uv-0.5;\n  vec2 uvp=vec2(_c*_off.x-_s*_off.y,_s*_off.x+_c*_off.y)+0.5;`,
+  ];
+  const mk = modKernels[_clamp(modType, 0, modKernels.length - 1)];
+
+  // ── Operation-order bodies ─────────────────────────────────────────────────
+  // Each produces a complete void main(){…} body (no uniforms, just code).
+  // Variables available at entry: uv, dx, dy, mod_a (= iFeedbackModAmount).
+  const opBodies = [
+
+    /* 0 Standard: mod UV → sample → mask(curr) → blend */
+    `  ${mk('mod_a')}
+  vec4 curr = texture2D(iCurrent, uv);
+  vec4 prev = texture2D(iPrevious, clamp(uvp,0.,1.));
+  float mask = ${maskExpr};
+  float alpha = iFeedbackAmount * mask;
+  gl_FragColor = ${blendExpr};`,
+
+    /* 1 Mask-gate: mask(curr) first → gates mod_a → mod UV → sample → blend */
+    `  vec4 curr = texture2D(iCurrent, uv);
+  vec4 prev0 = texture2D(iPrevious, uv);  // temp prev at plain uv for mask
+  float mask0 = ${maskExpr.replace(/\bprev\b/g,'prev0')};
+  float gated_a = mod_a * mask0;
+  ${mk('gated_a')}
+  vec4 prev = texture2D(iPrevious, clamp(uvp,0.,1.));
+  float mask = mask0;
+  float alpha = iFeedbackAmount * mask;
+  gl_FragColor = ${blendExpr};`,
+
+    /* 2 Inv-gate: (1-mask) gates mod_a → stronger warping in dark/low areas */
+    `  vec4 curr = texture2D(iCurrent, uv);
+  vec4 prev0 = texture2D(iPrevious, uv);
+  float mask0 = ${maskExpr.replace(/\bprev\b/g,'prev0')};
+  float inv_a = mod_a * (1.0 - mask0);
+  ${mk('inv_a')}
+  vec4 prev = texture2D(iPrevious, clamp(uvp,0.,1.));
+  float mask = mask0;
+  float alpha = iFeedbackAmount * mask;
+  gl_FragColor = ${blendExpr};`,
+
+    /* 3 Warp-then-mask: mod UV → sample warped prev → mask compares curr vs warped prev */
+    `  ${mk('mod_a')}
+  vec4 curr = texture2D(iCurrent, uv);
+  vec4 prev = texture2D(iPrevious, clamp(uvp,0.,1.));
+  // mask uses warped prev (hue dist now measures warp displacement)
+  float mask = ${maskExpr};
+  float alpha = iFeedbackAmount * mask;
+  gl_FragColor = ${blendExpr};`,
+
+    /* 4 Mask-steers-UV: mask from curr biases the UV warp direction toward bright pixels */
+    `  vec4 curr = texture2D(iCurrent, uv);
+  // Sample neighbours to estimate gradient of curr brightness
+  float lx = dot(texture2D(iCurrent,uv+vec2(dx,0.)).rgb,vec3(.299,.587,.114));
+  float rx = dot(texture2D(iCurrent,uv-vec2(dx,0.)).rgb,vec3(.299,.587,.114));
+  float ly = dot(texture2D(iCurrent,uv+vec2(0.,dy)).rgb,vec3(.299,.587,.114));
+  float ry = dot(texture2D(iCurrent,uv-vec2(0.,dy)).rgb,vec3(.299,.587,.114));
+  vec2 grad = vec2(lx-rx, ly-ry) * mod_a * 0.05;
+  vec2 uvg = uv + grad;  // gradient-steered base UV
+  ${mk('mod_a').replace(/\buv\b/g,'uvg').replace('uvg.yx','uv.yx')}
+  vec4 prev = texture2D(iPrevious, clamp(uvp,0.,1.));
+  float mask = ${maskExpr};
+  float alpha = iFeedbackAmount * mask;
+  gl_FragColor = ${blendExpr};`,
+
+    /* 5 Mod-vs-amount: mod_a and iFeedbackAmount trade off (their product stays ~constant) */
+    `  // higher mod_a → more UV warp, less blend amount, and vice versa
+  float traded_blend = iFeedbackAmount * (1.0 - mod_a * 0.5);
+  float traded_mod   = mod_a * (1.0 + iFeedbackAmount * 0.5);
+  ${mk('traded_mod')}
+  vec4 curr = texture2D(iCurrent, uv);
+  vec4 prev = texture2D(iPrevious, clamp(uvp,0.,1.));
+  float mask = ${maskExpr};
+  float alpha = traded_blend * mask;
+  gl_FragColor = ${blendExpr};`,
+  ];
+
+  const body = opBodies[_clamp(opOrder, 0, opBodies.length - 1)];
+
+  return `precision mediump float;
+uniform sampler2D iCurrent;
+uniform sampler2D iPrevious;
+uniform float iFeedbackAmount;
+uniform float iFeedbackModAmount;
+uniform float iTime;
+uniform vec3  iChromaKeyColor;
+uniform float iChromaThreshold;
+uniform float iChromaSoftness;
+uniform int   iChromaMode;
+
+vec3 rgb2hsv(vec3 c) {
+  vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+  vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
+  vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+  float d = q.x - min(q.w, q.y);
+  float e = 1.0e-10;
+  return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
+}
+
+float calcChroma(vec3 col, vec3 key, float threshold, float softness, int mode) {
+  float d = 0.0;
+  if (mode == 0) {
+    d = distance(col, key);
+  } else {
+    vec3 hsv = rgb2hsv(col);
+    vec3 keyHsv = rgb2hsv(key);
+    if (mode == 1) {
+      d = abs(hsv.x - keyHsv.x);
+      if (d > 0.5) d = 1.0 - d;
+      d *= 2.0; // scale to 0-1 range for distance
+    } else if (mode == 2) {
+      d = abs(hsv.y - keyHsv.y);
+    } else if (mode == 3) {
+      d = abs(hsv.z - keyHsv.z);
+    }
+  }
+  return smoothstep(threshold, threshold + softness, d);
+}
+
+void main(){
+  vec2 uv = gl_FragCoord.xy / vec2(${width}.0, ${height}.0);
+  float dx = 1.0 / ${width}.0;
+  float dy = 1.0 / ${height}.0;
+  float mod_a = iFeedbackModAmount;
+${body}
+}`;
+}
+
+

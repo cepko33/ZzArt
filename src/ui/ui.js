@@ -4,6 +4,7 @@ import { ShaderObject } from '../shader/ShaderObject';
 import { AddToSaveList, DeleteSelectedSave, ExportSaveList, SaveLocalStorage } from '../storage';
 import download from '../utils/download';
 import { JSONCrush } from '../utils/jsonCrush';
+import { ClearFeedback } from '../webgl';
 
 export function SetGridSize(newGridSize)
 {
@@ -38,7 +39,7 @@ export function UpdateUI(resetSaveListSelection=1)
     state.button_preview.disabled = !state.favoriteShader || state.favoriteShader.gridPosX<0;
     state.canvas_main.hidden = state.showPreview;
     state.canvas_shader.hidden = !state.showPreview;
-    state.div_advanced.style.display = state.advancedMode? 'inline' : 'none';
+    state.div_advanced.style.display = state.advancedMode? 'block' : 'none';
     state.button_delete.style.display = state.advancedMode? 'inline' : 'none';
     state.button_help.style.display = state.advancedMode? 'none' : 'inline';
     state.textarea_debug.hidden = state.textarea_debug.value == '';
@@ -46,6 +47,68 @@ export function UpdateUI(resetSaveListSelection=1)
     
     let s = state.shaderMemory[state.shaderMemoryLocation];
     state.span_generations.innerHTML = s.GetGenerationString();
+    
+    // ── Sync feedback controls from current shader ──────────────────────────
+    if (state.checkbox_useFeedback && state.favoriteShader)
+    {
+        let fs = state.favoriteShader;
+        state.checkbox_useFeedback.checked       = !!fs.useFeedback;
+        state.select_feedbackBlendMode.value     = fs.feedbackBlendMode  ?? 0;
+        state.range_feedbackAmount.value         = fs.feedbackAmount     ?? 0.92;
+        state.span_feedbackAmount.textContent    = (fs.feedbackAmount    ?? 0.92).toFixed(2);
+        state.select_feedbackMaskType.value      = fs.feedbackMaskType   ?? 0;
+        state.select_feedbackModType.value       = fs.feedbackModType    ?? 0;
+        state.range_feedbackModAmount.value      = fs.feedbackModAmount  ?? 0.3;
+        state.span_feedbackModAmount.textContent = (fs.feedbackModAmount ?? 0.3).toFixed(2);
+        state.select_feedbackOpOrder.value       = fs.feedbackOpOrder    ?? 0;
+        state.checkbox_feedbackSwap.checked      = !!fs.feedbackSwap;
+
+        // Chroma Key Sync
+        if (state.select_feedbackChromaMode)
+        {
+            state.select_feedbackChromaMode.value     = fs.chromaMode ?? 0;
+            state.range_feedbackChromaThreshold.value = fs.chromaThreshold ?? 0.1;
+            state.span_feedbackChromaThreshold.textContent = (fs.chromaThreshold ?? 0.1).toFixed(2);
+            state.range_feedbackChromaSoftness.value  = fs.chromaSoftness ?? 0.1;
+            state.span_feedbackChromaSoftness.textContent  = (fs.chromaSoftness ?? 0.1).toFixed(2);
+            state.div_chromaSettings.style.display    = (fs.feedbackMaskType === 6) ? 'block' : 'none';
+            
+            // RGB Vector3 to Hex Color
+            const r = Math.round((fs.chromaKeyColor?.x ?? 0) * 255).toString(16).padStart(2, '0');
+            const g = Math.round((fs.chromaKeyColor?.y ?? 1) * 255).toString(16).padStart(2, '0');
+            const b = Math.round((fs.chromaKeyColor?.z ?? 0) * 255).toString(16).padStart(2, '0');
+            state.input_feedbackChromaKeyColor.value  = `#${r}${g}${b}`;
+        }
+    }
+    
+    // ── Feedback quick-toggle button state ──────────────────────────────────
+    let hasFavorite = state.favoriteShader && state.favoriteShader.IsVariation();
+    let feedbackOn  = state.favoriteShader && !!state.favoriteShader.useFeedback;
+    if (state.button_feedback)
+    {
+        state.button_feedback.disabled         = !hasFavorite;
+        state.button_feedback.style.background = feedbackOn ? '#4a4' : '';
+        state.button_feedback.title            = feedbackOn ? 'Feedback ON [F]' : 'Feedback OFF [F]';
+    }
+    
+    // ── Preview animation loop (starts when preview is shown, self-stops) ───
+    if (state.showPreview && !state._previewAnimating)
+    {
+        state._previewAnimating = true;
+        (function AnimatePreview()
+        {
+            if (state.showPreview && !state.satelliteMode)
+            {
+                if (state.favoriteShader && state.favoriteShader.IsVariation())
+                    state.favoriteShader.Render(true);
+                requestAnimationFrame(AnimatePreview);
+            }
+            else
+            {
+                state._previewAnimating = false;
+            }
+        })();
+    }
     
     let isMobile = IsMobile();
     if (isMobile || state.itchMode)
@@ -173,6 +236,28 @@ export function ButtonAdvanced()
     UpdateUI();
 }
 
+export function ButtonToggleFeedback()
+{
+    if (!state.favoriteShader) return;
+
+    // Toggle the flag
+    state.favoriteShader.useFeedback = state.favoriteShader.useFeedback ? 0 : 1;
+
+    // Sync advanced panel checkbox
+    if (state.checkbox_useFeedback)
+        state.checkbox_useFeedback.checked = !!state.favoriteShader.useFeedback;
+
+    // Clear accumulation when enabling (or when clearOnChange is set)
+    if (state.feedbackClearOnChange || state.favoriteShader.useFeedback)
+        ClearFeedback();
+
+    // Start preview automatically when feedback is enabled
+    if (state.favoriteShader.useFeedback && !state.showPreview && state.favoriteShader.IsVariation())
+        ButtonTogglePreview();
+    else
+        UpdateUI();
+}
+
 export function ButtonTogglePreview()
 {
     state.showPreview = !state.showPreview;
@@ -182,7 +267,12 @@ export function ButtonTogglePreview()
         state.canvas_shader.width = state.canvas_main.width;
         state.canvas_shader.height = state.canvas_main.height;
         if (state.favoriteShader && state.favoriteShader.IsVariation())
-            state.favoriteShader.Render();
+        {
+            // clear accumulation buffer before first fullscreen render
+            if (state.feedbackClearOnChange)
+                ClearFeedback();
+            state.favoriteShader.Render(true);
+        }
     }
         
     UpdateUI();
@@ -195,13 +285,13 @@ export function ButtonSave()
 
     AddToSaveList(state.favoriteShader);
 
-    // save large
+    // save large (single pass – no feedback on export)
     let saveScale = parseInt(state.input_saveScale.value);
     if (saveScale <= 0)
         return;
     state.canvas_shader.width = saveScale*state.defaultCanvasWidth;
     state.canvas_shader.height = saveScale*state.defaultCanvasHeight;
-    state.favoriteShader.Render();
+    state.favoriteShader.Render(false);  // no feedback on save
 
     let canvas = state.canvas_shader;
 
@@ -335,6 +425,10 @@ export function DrawShaders()
 
 export function SetBest(bestX, bestY)
 {
+    // Clear feedback accumulation buffer when the active shader changes
+    if (state.feedbackClearOnChange)
+        ClearFeedback();
+
     state.favoriteShader = state.shaderGrid[bestX][bestY];
     state.favoriteShader.randSeed = state.randSeed;
     
@@ -448,6 +542,8 @@ export function UpdateSatelliteMode()
         if (rawObject.uniqueID != state.favoriteShader.uniqueID)
         {
             // redraw new favorite
+            if (state.feedbackClearOnChange)
+                ClearFeedback();
             state.favoriteShader = Object.assign(new ShaderObject(), rawObject).Clone();
             state.span_generationsSatellite.innerHTML = state.favoriteShader.GetGenerationString();
         }
@@ -474,7 +570,7 @@ export function InitSatelliteMode()
     
     function Animate() {
         if (state.satelliteMode) {
-            state.favoriteShader.Render();
+            state.favoriteShader.Render(true);  // satellite always renders with feedback
             requestAnimationFrame(Animate);
         }
     }
