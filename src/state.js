@@ -22,6 +22,7 @@ export const state = {
     time: 0,
     maxIterations: 9,
     vertexShader: 0,
+    lastSatelliteUpdate: 0,
     
     // UI DOM Refs
     canvas_main: null,

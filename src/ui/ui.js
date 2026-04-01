@@ -590,12 +590,14 @@ export function UpdateSatelliteMode()
     let localStorageItem = localStorage.saveData;
     if (localStorageItem)
     {
-        let saveData = JSON.parse(localStorage.saveData);
-        let rawObject = saveData.favorite;
-        if (rawObject.uniqueID != state.favoriteShader.uniqueID)
+        let saveData = JSON.parse(localStorageItem);
+        if (saveData.lastUpdate != state.lastSatelliteUpdate)
         {
+            state.lastSatelliteUpdate = saveData.lastUpdate;
+            let rawObject = saveData.favorite;
+            
             // redraw new favorite
-            if (state.feedbackClearOnChange)
+            if (state.feedbackClearOnChange || rawObject.uniqueID != state.favoriteShader?.uniqueID)
                 ClearFeedback();
             state.favoriteShader = Object.assign(new ShaderObject(), rawObject).Clone();
             state.span_generationsSatellite.innerHTML = state.favoriteShader.GetGenerationString();

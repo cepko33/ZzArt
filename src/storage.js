@@ -16,7 +16,8 @@ export function SaveLocalStorage()
         showWatermark: state.checkbox_showWatermark.checked,
         advancedMode: state.advancedMode,
         gridSize: state.gridSize,
-        favorite: shader
+        favorite: shader,
+        lastUpdate: Date.now()
     }
         
     localStorage.version = state.dataVersion;

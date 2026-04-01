@@ -2,7 +2,7 @@ import { state } from './state';
 import { RandSeeded, IsMobile } from './utils/math';
 import { InitWebgl, ClearFeedback } from './webgl';
 import { ShaderObject } from './shader/ShaderObject';
-import { LoadLocalStorage, LoadSavedShaderList, DeleteSelectedSave, ExportSaveList, ImportSaveList, SelectSavedShader, LoadSettingsFromCookie, SaveSettingsToCookie } from './storage';
+import { SaveLocalStorage, LoadLocalStorage, LoadSavedShaderList, DeleteSelectedSave, ExportSaveList, ImportSaveList, SelectSavedShader, LoadSettingsFromCookie, SaveSettingsToCookie } from './storage';
 import { InitSatelliteMode, SetFavoriteFromMemory, TryToRotate, DrawShaders, UpdateUI, ChangeMemoryLocation, ButtonTogglePreview, ButtonToggleFeedback, ButtonSave, DisplaySaveListPage, ButtonRandomize, ButtonShare, ButtonSeed, ButtonSatellite, ButtonAdvanced, ButtonHelp, SetGridSize, OpenCapJS, SetBest, ButtonSatelliteHelp } from './ui/ui';
 
 // Map HTML global IDs to window object so inline event handlers in HTML still work
@@ -90,6 +90,9 @@ function UpdateFeedbackUI()
     // Re-render live if preview is showing
     if (state.showPreview && state.favoriteShader.IsVariation())
         state.favoriteShader.Render(true);
+
+    // Save to local storage for satellite sync
+    SaveLocalStorage();
 }
 window.UpdateFeedbackUI = UpdateFeedbackUI;
 
