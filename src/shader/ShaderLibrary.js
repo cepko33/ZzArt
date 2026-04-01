@@ -199,13 +199,17 @@ export const SHADER_LIB_FUNCTIONS = [
     name: 'CosinePalette',
     always: false, // emitted conditionally by GetCode based on usePalette
     usesTime: false,
-    body: `vec3 CosinePalette(float t, vec3 a, vec3 b, vec3 c, vec3 d) { return a + b*cos(6.28318*(c*t+d)); }`,
+    body:      `vec3 CosinePalette(float t, vec3 a, vec3 b, vec3 c, vec3 d) { return a + b*cos(6.28318*(c*t+d)); }`,
+    // iTime slowly cycles the phase offset d, making colors drift over time
+    bodyTimed: `vec3 CosinePalette(float t, vec3 a, vec3 b, vec3 c, vec3 d) { return a + b*cos(6.28318*(c*t+d+iTime*0.04)); }`,
   },
   {
     name: 'SmoothHSV',
     always: false, // emitted conditionally by GetCode based on !usePalette
     usesTime: false,
-    body: `vec3 SmoothHSV(vec3 c) { vec3 rgb=clamp(abs(mod(c.x*6.+vec3(0,4,2),6.)-3.)-1.,0.,1.); return c.z*mix(vec3(1),rgb*rgb*(3.-2.*rgb),c.y); }`,
+    body:      `vec3 SmoothHSV(vec3 c) { vec3 rgb=clamp(abs(mod(c.x*6.+vec3(0,4,2),6.)-3.)-1.,0.,1.); return c.z*mix(vec3(1),rgb*rgb*(3.-2.*rgb),c.y); }`,
+    // iTime slowly rotates the hue
+    bodyTimed: `vec3 SmoothHSV(vec3 c) { c.x+=iTime*0.03; vec3 rgb=clamp(abs(mod(c.x*6.+vec3(0,4,2),6.)-3.)-1.,0.,1.); return c.z*mix(vec3(1),rgb*rgb*(3.-2.*rgb),c.y); }`,
   },
 ];
 
@@ -256,10 +260,10 @@ export function buildPreamble(usedNames, usePalette, useTimeInLib) {
   // Palette / color-space helper (always exactly one of the two)
   if (usePalette) {
     const fn = SHADER_LIB_FUNCTIONS.find(f => f.name === 'CosinePalette');
-    out += fn.body + '\n';
+    out += ((useTimeInLib && fn.bodyTimed) ? fn.bodyTimed : fn.body) + '\n';
   } else {
     const fn = SHADER_LIB_FUNCTIONS.find(f => f.name === 'SmoothHSV');
-    out += fn.body + '\n';
+    out += ((useTimeInLib && fn.bodyTimed) ? fn.bodyTimed : fn.body) + '\n';
   }
 
   out += '\n';
