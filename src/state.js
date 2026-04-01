@@ -91,4 +91,19 @@ export const state = {
     range_feedbackBlur: null,
     span_feedbackBlur: null,
     checkbox_feedbackLock: null,
+
+    // Pipeline Viewer DOM Refs
+    div_pipelineSourceCode: null,
+    div_pipelineFeedbackCode: null,
+    div_feedbackLoopContainer: null,
+    svg_feedbackLoopPath: null,
+    div_nodeCompositorParams: null,
+    div_bufferHistoryNodes: null,
+    div_pipelineOutputConnection: null,
+
+    // Async Grid Render State
+    gridRenderQueue: [],       // list of [X, Y] coordinates
+    gridRenderRecords: [],     // flat list or Map of {x, y, canvas, opacity, rendered}
+    isRenderingGrid: false,    // flag to keep loop alive
+    gridRenderId: 0,           // used to cancel old render loops
 };

@@ -64,10 +64,89 @@ todo
 <div id=div_credit><font size=3>ZzArt © <a href="http://www.frankforce.com" target="_blank">Frank Force</a> 2019 ☮♥☻␌</font></div>
 <div id=div_advanced style="display:none;"><hr>
 <div class="advanced-container">
-    <!-- Generation & App Settings -->
-    <div class="advanced-column settings-column">
-        <div class="advanced-group">
-            <h3>⚙️ Settings</h3>
+    <!-- Pipeline Column (Left) -->
+    <div class="advanced-column pipeline-column">
+        <details class="advanced-group">
+            <summary>𝓡𝓮𝓷𝓭𝓮𝓻𝓲𝓷𝓰 𝓟𝓲𝓹𝓮𝓵𝓲𝓷𝓮</summary>
+            <div id="pipeline_container" class="pipeline-container">
+                <div class="pipeline-flow">
+                    <!-- Node 1: Generator -->
+                    <div class="pipeline-node generator-node">
+                        <div class="node-header">
+                            <span>⚡ GENERATOR (PASS 1)</span>
+                            <div class="node-params">
+                                <span class="node-param-tag active" title="Renders procedural content">Procedural</span>
+                            </div>
+                        </div>
+                        <div id="pipeline_source_code" class="code-viewer"></div>
+                        <button class="copy-btn" onclick="CopyCode(state.div_pipelineSourceCode.textContent)">Copy Source Code</button>
+                    </div>
+
+                    <div class="pipeline-connection pulse"></div>
+
+                    <!-- Buffer: Raw -->
+                    <div class="buffer-nodes">
+                        <div class="buffer-tag active"><b>RAW</b> (Buffer 0)</div>
+                    </div>
+
+                    <div class="pipeline-connection pulse"></div>
+
+                    <!-- Feedback Loop & Compositor -->
+                    <div id="feedback_loop_container" class="feedback-loop-container">
+                        <svg class="feedback-svg" viewBox="0 0 100 100">
+                            <path id="feedback_loop_path" class="feedback-path" d="M 80,50 C 110,50 110,-50 80,-50" transform="translate(-10, 50) rotate(-90, 50, 50)"></path>
+                        </svg>
+                        
+                        <div class="pipeline-node compositor-node">
+                            <div class="node-header">
+                                <span>🌀 COMPOSITOR (PASS 2)</span>
+                                <div id="node_compositor_params" class="node-params">
+                                    <!-- Filled by JS -->
+                                </div>
+                            </div>
+                            <div id="pipeline_feedback_code" class="code-viewer"></div>
+                            <button class="copy-btn" onclick="CopyCode(state.div_pipelineFeedbackCode.textContent)">Copy Feedback Code</button>
+                        </div>
+                    </div>
+
+                    <div class="pipeline-connection pulse"></div>
+
+                    <!-- Buffer: Ping-Pong History -->
+                    <div id="buffer_history_nodes" class="buffer-nodes">
+                        <div class="buffer-tag history"><b>HIST A</b> (Buff 1)</div>
+                        <div class="buffer-tag history"><b>HIST B</b> (Buff 2)</div>
+                    </div>
+
+                    <div id="pipeline_output_connection" class="pipeline-connection pulse"></div>
+
+                    <!-- Node 3: Output (Blit) -->
+                    <div class="pipeline-node output-node">
+                        <div class="node-header">
+                            <span>📺 OUTPUT (PASS 3)</span>
+                            <div class="node-params">
+                                <span class="node-param-tag active">Screen Blit</span>
+                            </div>
+                        </div>
+                        <div class="code-viewer" style="max-height: 40px; color: #5AF;">
+                            Final image blitted to viewport after accumulation path...
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <h3 style="margin-top:20px;">📜 Raw GLSL Output</h3>
+            <textarea disabled id=textarea_code rows=4></textarea>
+            <textarea disabled hidden id=textarea_debug style="color:#F00;" rows=4></textarea>
+            <h3 style="margin-top:10px;">🔗 Persistence (Base 64 JSON)</h3>
+            <textarea disabled id=textarea_json rows=4></textarea>
+        </details>
+    </div>
+
+    <!-- Controls Column (Right) -->
+    <div class="advanced-column controls-column">
+        <!-- Settings & Saves Group -->
+        <details class="advanced-group" open>
+            <summary>⚙️ Settings & 💾 Saves</summary>
             <div class="control-row">
                 <label><input id=checkbox_showWatermark onclick=UpdateUI() type=checkbox> Watermark</label>
                 <label><input id=checkbox_feedbackClear type=checkbox checked onchange=UpdateFeedbackUI()> Clear on Change</label>
@@ -88,28 +167,22 @@ todo
                 <span>Rand Len:</span>
                 <input type=number id=input_randomizeLength class=advanced value=15>
             </div>
-        </div>
-        <div class="advanced-group buttons-group">
-            <button class="action-button" onclick=OpenCapJS()>CapJS</button>
-            <button class="action-button" onclick=ExportSaveList()>Export</button>
-            <button class="action-button" onclick=input_importFile.click()>Import</button>
-            <input id=input_importFile type="file" style="display:none">
-            <button class="action-button danger" onclick=DeleteSelectedSave()>Delete</button>
-        </div>
-    </div>
+            
+            <div style="margin-top:20px; border-top:1px solid #333; padding-top:10px; font-weight: bold; color: #5AF;">💾 Saved Shaders</div>
+            <select id=select_saveList onchange=SelectSavedShader(select_saveList.selectedIndex) size=6 style="width:100%; margin-bottom:10px;"></select>
+            
+            <div class="buttons-group">
+                <button class="action-button" onclick=OpenCapJS()>CapJS</button>
+                <button class="action-button" onclick=ExportSaveList()>Export</button>
+                <button class="action-button" onclick=input_importFile.click()>Import</button>
+                <input id=input_importFile type="file" style="display:none">
+                <button class="action-button danger" onclick=DeleteSelectedSave()>Delete</button>
+            </div>
+        </details>
 
-    <!-- Saved Shaders -->
-    <div class="advanced-column saves-column">
-        <div class="advanced-group">
-            <h3>💾 Saved Shaders</h3>
-            <select id=select_saveList onchange=SelectSavedShader(select_saveList.selectedIndex) size=10></select>
-        </div>
-    </div>
-
-    <!-- Feedback Controls -->
-    <div class="advanced-column feedback-column">
-        <div class="advanced-group">
-            <h3>🌀 Feedback</h3>
+        <!-- Feedback Group -->
+        <details class="advanced-group">
+            <summary>🌀 Feedback</summary>
             <div class="control-row">
                 <label><input id=checkbox_useFeedback type=checkbox onchange=UpdateFeedbackUI()> <b>Enable</b></label>
                 <label><input id=checkbox_feedbackLock type=checkbox onchange=UpdateFeedbackUI()> Lock</label>
@@ -207,18 +280,7 @@ todo
                 <span>Blur: <span id=span_feedbackBlur>0.00</span></span>
                 <input id=range_feedbackBlur type=range min=0 max=1 step=0.01 value=0 oninput=UpdateFeedbackUI()>
             </div>
-        </div>
-    </div>
-
-    <!-- Technical Output -->
-    <div class="advanced-column technical-column">
-        <div class="advanced-group">
-            <h3>📜 GLSL Code</h3>
-            <textarea disabled id=textarea_code rows=8></textarea>
-            <textarea disabled hidden id=textarea_debug style="color:#F00;" rows=4></textarea>
-            <h3 style="margin-top:10px;">🔗 Base 64 JSON</h3>
-            <textarea disabled id=textarea_json rows=4></textarea>
-        </div>
+        </details>
     </div>
 </div></div>
 

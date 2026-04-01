@@ -5,6 +5,7 @@ import { AddToSaveList, DeleteSelectedSave, ExportSaveList, SaveLocalStorage, Sa
 import download from '../utils/download';
 import { JSONCrush } from '../utils/jsonCrush';
 import { ClearFeedback } from '../webgl';
+import { buildCompositeShader } from '../shader/ShaderLibrary';
 
 export function SetGridSize(newGridSize)
 {
@@ -44,6 +45,9 @@ export function UpdateUI(resetSaveListSelection=1)
     state.button_help.style.display = state.advancedMode? 'none' : 'inline';
     state.textarea_debug.hidden = state.textarea_debug.value == '';
     state.button_saveFolder.style.display = state.saveList.length==0? 'none' : 'inline';
+
+    if (state.advancedMode)
+        UpdatePipelineUI();
     
     let s = state.shaderMemory[state.shaderMemoryLocation];
     state.span_generations.innerHTML = s.GetGenerationString();
@@ -277,9 +281,9 @@ export function ButtonTogglePreview()
         if (state.favoriteShader && state.favoriteShader.IsVariation())
         {
             // clear accumulation buffer before first fullscreen render
-            if (state.feedbackClearOnChange)
-                ClearFeedback();
-            state.favoriteShader.Render(true);
+            ClearFeedback();
+            for(let i=0; i<10; i++)
+                state.favoriteShader.Render(true);
         }
     }
         
@@ -411,46 +415,132 @@ export function RandomizeShaders(keepFeedback = false)
 
 export function DrawShaders()
 {
-    let x = state.canvasContext_main;
     let c = state.canvas_main;
-    c.width|=0;
+    let ctx = state.canvasContext_main;
+
+    // Increment and store current render ID to cancel any stale loops
+    state.gridRenderId++;
+    const currentRenderId = state.gridRenderId;
     
-    let gap = 10;
-    let G = state.gridSize;
-    let SX = (c.width-gap)/G;
-    let SY = (c.height-gap)/G;
-    let W = (c.width - gap*(state.gridSize+1))/G;
-    let H = (c.height - gap*(state.gridSize+1))/G;
-    
-    // use small hight for previews
-    state.canvas_shader.width = W;
-    state.canvas_shader.height = H;
-    
+    // Clear and prepare render metadata
+    state.gridRenderQueue = [];
+    state.gridRenderRecords = [];
+
+    const G = state.gridSize;
     for(let X=0; X<G; X++)
     for(let Y=0; Y<G; Y++)
     {
-        let shader = state.shaderGrid[X][Y];
-        shader.Render();
-        
-        let posX = gap+SX*X;
-        let posY = gap+SY*Y;
-        x.drawImage(state.canvas_shader, posX, posY, W, H);
-        x.beginPath()
-        x.rect(posX,posY,W,H);
-        x.lineWidth=2;
-        x.strokeStyle='#000';
-        x.stroke();
+        state.gridRenderQueue.push({x: X, y: Y});
+        state.gridRenderRecords.push({
+            x: X, 
+            y: Y, 
+            opacity: 0, 
+            rendered: false,
+            canvas: document.createElement('canvas')
+        });
     }
-        
-    if (state.favoriteShader.gridPosX >=0 && state.favoriteShader.gridPosY >=0)
+
+    // Start loop
+    requestAnimationFrame(() => AnimateGridRender(currentRenderId));
+}
+
+function AnimateGridRender(renderId)
+{
+    // If a newer render has started, abort this one
+    if (renderId !== state.gridRenderId) return;
+
+    const ctx = state.canvasContext_main;
+    const c = state.canvas_main;
+    const G = state.gridSize;
+    const gap = 10;
+    const SX = (c.width - gap) / G;
+    const SY = (c.height - gap) / G;
+    const W = (c.width - gap * (G + 1)) / G;
+    const H = (c.height - gap * (G + 1)) / G;
+
+    // Process up to 2 items per frame to keep it snappy but responsive
+    for (let i = 0; i < 2; i++)
     {
-        let posX = gap+SX*state.favoriteShader.gridPosX;
-        let posY = gap+SY*state.favoriteShader.gridPosY;
-        x.beginPath()
-        x.rect(posX-gap/2,posY-gap/2,W+gap,H+gap);
-        x.lineWidth=7;
-        x.strokeStyle='#f00';
-        x.stroke();
+        if (state.gridRenderQueue.length > 0)
+        {
+            const {x, y} = state.gridRenderQueue.shift();
+            const shader = state.shaderGrid[x][y];
+            
+            // Render the shader to the shared offscreen canvas
+            state.canvas_shader.width = W;
+            state.canvas_shader.height = H;
+            
+            if (shader.useFeedback)
+            {
+                ClearFeedback();
+                for(let j=0; j<10; j++)
+                    shader.Render(true);
+            }
+            else
+            {
+                shader.Render();
+            }
+
+            // Copy the result to the cell's private cache canvas
+            const record = state.gridRenderRecords.find(r => r.x === x && r.y === y);
+            if (record)
+            {
+                record.canvas.width = W;
+                record.canvas.height = H;
+                const rCtx = record.canvas.getContext('2d');
+                rCtx.drawImage(state.canvas_shader, 0, 0, W, H);
+                record.rendered = true;
+            }
+        }
+    }
+
+    // Clear main canvas for redraw
+    ctx.clearRect(0, 0, c.width, c.height);
+
+    let allDone = (state.gridRenderQueue.length === 0);
+    let anyStillFading = false;
+
+    for (let record of state.gridRenderRecords)
+    {
+        const posX = gap + SX * record.x;
+        const posY = gap + SY * record.y;
+
+        if (record.rendered)
+        {
+            if (record.opacity < 1.0)
+            {
+                record.opacity += 0.08; 
+                if (record.opacity > 1.0) record.opacity = 1.0;
+                else anyStillFading = true;
+            }
+
+            ctx.globalAlpha = record.opacity;
+            ctx.drawImage(record.canvas, posX, posY);
+            ctx.globalAlpha = 1.0;
+        }
+
+        // Selection box (if favorite)
+        const fs = state.favoriteShader;
+        if (fs && fs.gridPosX === record.x && fs.gridPosY === record.y)
+        {
+            ctx.beginPath();
+            ctx.rect(posX - gap / 2, posY - gap / 2, W + gap, H + gap);
+            ctx.lineWidth = 7;
+            ctx.strokeStyle = '#f00';
+            ctx.stroke();
+        }
+        
+        // Cell border
+        ctx.beginPath();
+        ctx.rect(posX, posY, W, H);
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#000';
+        ctx.stroke();
+    }
+
+    if (!allDone || anyStillFading)
+    {
+        requestAnimationFrame(() => AnimateGridRender(renderId));
     }
 }
 
@@ -652,4 +742,120 @@ export function TryToRotate()
         state.canvas_main.width = state.defaultCanvasWidth;
         state.canvas_main.height = state.defaultCanvasHeight;
     }
+}
+
+export function UpdatePipelineUI()
+{
+    console.log("Updating Pipeline UI...");
+    if (!state.favoriteShader || !state.div_pipelineSourceCode || !state.div_pipelineFeedbackCode)
+        return;
+
+    const fs = state.favoriteShader;
+    const isFeedbackActive = !!fs.useFeedback;
+
+    // 1. Get Source Code (Pass 1)
+    const sourceCode = fs.GetCode();
+    state.div_pipelineSourceCode.innerHTML = highlightShader(sourceCode);
+
+    // 2. Update Feedback Loop Visibility
+    if (state.div_feedbackLoopContainer)
+    {
+        state.div_feedbackLoopContainer.style.opacity = isFeedbackActive ? '1' : '0.3';
+        state.svg_feedbackLoopPath.style.opacity = isFeedbackActive ? '1' : '0';
+        state.div_bufferHistoryNodes.style.opacity = isFeedbackActive ? '1' : '0.2';
+        state.div_pipelineOutputConnection.style.opacity = isFeedbackActive ? '1' : '0.2';
+    }
+
+    // 3. Build Feedback Code (Pass 2)
+    const w = state.canvas_main.width;
+    const h = state.canvas_main.height;
+    
+    const feedbackCode = buildCompositeShader(
+        fs.feedbackBlendMode  ?? 0,
+        fs.feedbackMaskType   ?? 0,
+        fs.feedbackModType    ?? 0,
+        fs.feedbackOpOrder    ?? 0,
+        fs.feedbackSharpen    ?? 0,
+        fs.feedbackBlur       ?? 0,
+        w, h
+    );
+    state.div_pipelineFeedbackCode.innerHTML = highlightShader(feedbackCode);
+
+    // 4. Update Node Parameters (Tags)
+    if (state.div_nodeCompositorParams)
+    {
+        const blendNames = ['Mix', 'Add', 'Mult', 'Screen', 'Diff', 'Light', 'Dark', 'Burn', 'Atop'];
+        const maskNames  = ['None', 'Lum', 'Red', 'Edge', 'HueDist', 'Alpha', 'Chroma'];
+        const modNames   = ['None', 'Distort', 'Displace', 'Zoom', 'Rotate'];
+        const orderNames = ['Std', 'MskGt', 'InvGt', 'WrpMsk', 'MskUV', 'ModAmt'];
+
+        let tags = '';
+        tags += `<span class="node-param-tag active">Blend: ${blendNames[fs.feedbackBlendMode ?? 0]}</span>`;
+        tags += `<span class="node-param-tag active">Mask: ${maskNames[fs.feedbackMaskType ?? 0]}</span>`;
+        tags += `<span class="node-param-tag active">Mod: ${modNames[fs.feedbackModType ?? 0]}</span>`;
+        tags += `<span class="node-param-tag active">Order: ${orderNames[fs.feedbackOpOrder ?? 0]}</span>`;
+        
+        if (fs.feedbackSharpen > 0) tags += `<span class="node-param-tag active" style="color:#F85">Sharp</span>`;
+        if (fs.feedbackBlur > 0)    tags += `<span class="node-param-tag active" style="color:#5AF">Blur</span>`;
+        
+        state.div_nodeCompositorParams.innerHTML = tags;
+    }
+
+    // 5. Update Buffer Status
+    if (state.div_bufferHistoryNodes)
+    {
+        const tags = state.div_bufferHistoryNodes.querySelectorAll('.buffer-tag');
+        if (tags.length >= 2)
+        {
+            // feedbackIndex is which slot is "previous" history
+            // we highlight the one currently being read as history
+            tags[0].classList.toggle('active', state.feedbackIndex === 1);
+            tags[1].classList.toggle('active', state.feedbackIndex === 2);
+        }
+    }
+}
+
+function highlightShader(code) {
+    if (!code) return '';
+    
+    // Escape HTML (simple)
+    let escaped = code.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    // Keywords
+    const keywords = ['precision', 'mediump', 'highp', 'float', 'uniform', 'const', 'attribute', 'varying', 'void', 'main', 'return', 'if', 'else', 'for', 'while', 'discard', 'break', 'continue'];
+    const types = ['vec2', 'vec3', 'vec4', 'mat2', 'mat3', 'mat4', 'sampler2D', 'int', 'bool'];
+    const functions = ['mainImage', 'texture2D', 'mix', 'clamp', 'length', 'sin', 'cos', 'dot', 'abs', 'floor', 'fract', 'step', 'smoothstep', 'distance', 'pow', 'sqrt', 'inversesqrt', 'asin', 'acos', 'atan', 'normalize'];
+    const uniforms = ['iTime', 'iResolution', 'iCurrent', 'iPrevious', 'iFeedbackAmount', 'iFeedbackModAmount', 'iChromaKeyColor', 'iChromaThreshold', 'iChromaSoftness', 'iChromaMode'];
+
+    // Numbers (positive only, to avoid complex negative handling for now)
+    escaped = escaped.replace(/\b(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?\b/g, '<span class="sh-number">$1$2</span>');
+
+    // Keywords
+    keywords.forEach(k => {
+        const re = new RegExp(`\\b${k}\\b`, 'g');
+        escaped = escaped.replace(re, `<span class="sh-keyword">${k}</span>`);
+    });
+
+    // Types
+    types.forEach(t => {
+        const re = new RegExp(`\\b${t}\\b`, 'g');
+        escaped = escaped.replace(re, `<span class="sh-type">${t}</span>`);
+    });
+
+    // Functions
+    functions.forEach(f => {
+        const re = new RegExp(`\\b${f}\\b`, 'g');
+        escaped = escaped.replace(re, `<span class="sh-func">${f}</span>`);
+    });
+
+    // Uniforms
+    uniforms.forEach(u => {
+        const re = new RegExp(`\\b${u}\\b`, 'g');
+        escaped = escaped.replace(re, `<span class="sh-uniform">${u}</span>`);
+    });
+
+    // Comments (simple single line/multi)
+    escaped = escaped.replace(/(\/\/.*)/g, '<span class="sh-comment">$1</span>');
+    
+    return escaped;
 }

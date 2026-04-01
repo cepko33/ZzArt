@@ -24,6 +24,13 @@ window.ExportSaveList = ExportSaveList;
 window.DeleteSelectedSave = DeleteSelectedSave;
 window.UpdateUI = UpdateUI;
 window.SelectSavedShader = SelectSavedShader;
+window.state = state;
+
+window.CopyCode = (text) => {
+    navigator.clipboard.writeText(text).then(() => {
+        // Feedback could be added here if desired
+    });
+};
 
 /**
  * Read the feedback controls from the DOM, apply to favoriteShader, and
@@ -131,6 +138,15 @@ function Init()
     state.input_importFile = document.getElementById('input_importFile');
     state.textarea_code = document.getElementById('textarea_code');
     state.textarea_json = document.getElementById('textarea_json');
+
+    // Pipeline Viewer
+    state.div_pipelineSourceCode = document.getElementById('pipeline_source_code');
+    state.div_pipelineFeedbackCode = document.getElementById('pipeline_feedback_code');
+    state.div_feedbackLoopContainer = document.getElementById('feedback_loop_container');
+    state.svg_feedbackLoopPath = document.getElementById('feedback_loop_path');
+    state.div_nodeCompositorParams = document.getElementById('node_compositor_params');
+    state.div_bufferHistoryNodes = document.getElementById('buffer_history_nodes');
+    state.div_pipelineOutputConnection = document.getElementById('pipeline_output_connection');
 
     // Feedback UI controls
     state.checkbox_useFeedback       = document.getElementById('checkbox_useFeedback');
