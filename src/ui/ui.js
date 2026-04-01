@@ -1,5 +1,5 @@
 import { state } from '../state';
-import { Rand, RandInt, RandSeeded, HashString, Clamp, IsMobile } from '../utils/math';
+import { Rand, RandInt, RandSeeded, HashString, Clamp, IsMobile, Vector3 } from '../utils/math';
 import { ShaderObject } from '../shader/ShaderObject';
 import { AddToSaveList, DeleteSelectedSave, ExportSaveList, SaveLocalStorage } from '../storage';
 import download from '../utils/download';
@@ -83,6 +83,9 @@ export function UpdateUI(resetSaveListSelection=1)
             const b = Math.round((fs.chromaKeyColor?.z ?? 0) * 255).toString(16).padStart(2, '0');
             state.input_feedbackChromaKeyColor.value  = `#${r}${g}${b}`;
         }
+        
+        if (state.checkbox_feedbackLock)
+            state.checkbox_feedbackLock.checked = !!state.feedbackLocked;
     }
     
     // ── Feedback quick-toggle button state ──────────────────────────────────
@@ -205,7 +208,7 @@ export function Randomize(seed)
     ++state.shaderMemoryLocation;
     state.shaderMemory.length=state.shaderMemoryLocation;
     state.shaderMemory.push(new ShaderObject());
-    RandomizeShaders();
+    RandomizeShaders(state.feedbackLocked);
     DrawShaders();
     UpdateUI();
 }
@@ -367,10 +370,33 @@ export function OpenCapJS()
     window.open(url);
 }
 
-export function RandomizeShaders()
+export function RandomizeShaders(keepFeedback = false)
 {
     state.saveListIndex = 0;
     state.favoriteShader = new ShaderObject();
+    if (keepFeedback)
+    {
+        // preserve feedback from previous favorite before randomizing
+        const oldShader = state.shaderMemory[state.shaderMemoryLocation-1];
+        if (oldShader)
+        {
+            state.favoriteShader.useFeedback       = oldShader.useFeedback;
+            state.favoriteShader.feedbackBlendMode = oldShader.feedbackBlendMode;
+            state.favoriteShader.feedbackAmount    = oldShader.feedbackAmount;
+            state.favoriteShader.feedbackMaskType  = oldShader.feedbackMaskType;
+            state.favoriteShader.feedbackModType   = oldShader.feedbackModType;
+            state.favoriteShader.feedbackModAmount = oldShader.feedbackModAmount;
+            state.favoriteShader.feedbackOpOrder   = oldShader.feedbackOpOrder;
+            state.favoriteShader.feedbackSwap      = oldShader.feedbackSwap;
+            state.favoriteShader.feedbackSharpen   = oldShader.feedbackSharpen;
+            state.favoriteShader.feedbackBlur      = oldShader.feedbackBlur;
+            state.favoriteShader.chromaMode        = oldShader.chromaMode;
+            state.favoriteShader.chromaKeyColor    = oldShader.chromaKeyColor.Clone? oldShader.chromaKeyColor.Clone() : Object.assign(new Vector3(), oldShader.chromaKeyColor);
+            state.favoriteShader.chromaThreshold   = oldShader.chromaThreshold;
+            state.favoriteShader.chromaSoftness    = oldShader.chromaSoftness;
+        }
+    }
+
     for(let i=9;i--;) Rand(); // warm up random number generator
     
     for(let X=0; X<state.gridSize; X++)
@@ -378,7 +404,7 @@ export function RandomizeShaders()
     {
         let shader = state.shaderGrid[X][Y] = state.favoriteShader.Clone();
         shader.SetGridPos(X,Y);
-        shader.Randomize();
+        shader.Randomize(keepFeedback);
     }
 }
 
@@ -432,6 +458,28 @@ export function SetBest(bestX, bestY)
     // Clear feedback accumulation buffer when the active shader changes
     if (state.feedbackClearOnChange)
         ClearFeedback();
+
+    // Copy current feedback settings to the selected variation if locked
+    // This allows manually tuned settings to carry over to the next generation
+    if (state.feedbackLocked && state.favoriteShader)
+    {
+        let target = state.shaderGrid[bestX][bestY];
+        let source = state.favoriteShader;
+        target.useFeedback       = source.useFeedback;
+        target.feedbackBlendMode = source.feedbackBlendMode;
+        target.feedbackAmount    = source.feedbackAmount;
+        target.feedbackMaskType  = source.feedbackMaskType;
+        target.feedbackModType   = source.feedbackModType;
+        target.feedbackModAmount = source.feedbackModAmount;
+        target.feedbackOpOrder   = source.feedbackOpOrder;
+        target.feedbackSwap      = source.feedbackSwap;
+        target.feedbackSharpen   = source.feedbackSharpen;
+        target.feedbackBlur      = source.feedbackBlur;
+        target.chromaMode        = source.chromaMode;
+        target.chromaKeyColor    = source.chromaKeyColor.Clone? source.chromaKeyColor.Clone() : Object.assign(new Vector3(), source.chromaKeyColor);
+        target.chromaThreshold   = source.chromaThreshold;
+        target.chromaSoftness    = source.chromaSoftness;
+    }
 
     state.favoriteShader = state.shaderGrid[bestX][bestY];
     state.favoriteShader.randSeed = state.randSeed;

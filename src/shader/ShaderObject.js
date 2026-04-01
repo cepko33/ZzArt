@@ -66,7 +66,7 @@ export class ShaderObject
         }
     }
     
-    Randomize()
+    Randomize(keepFeedback = false)
     {
         let statementCount = parseInt(state.input_randomizeLength.value);
         if (statementCount <0)
@@ -96,22 +96,25 @@ export class ShaderObject
             color.Randomize(0,1);
         
         // Feedback: off by default, 20 % chance to enable
-        this.useFeedback = Rand() < 0.2 ? 1 : 0;
-        if (this.useFeedback)
+        if (!keepFeedback)
         {
-            this.feedbackBlendMode  = RandInt(9);
-            this.feedbackAmount     = RandBetween(0.80, 0.97);
-            this.feedbackMaskType   = RandInt(5);
-            this.feedbackModType    = RandInt(5);
-            this.feedbackModAmount  = RandBetween(0.1, 0.6);
-            this.feedbackOpOrder    = RandInt(6);
-            this.feedbackSwap       = Rand() < 0.3 ? 1 : 0;
-            this.feedbackSharpen    = Rand() < 0.15 ? RandBetween(0.1, 0.4) : 0;
-            this.feedbackBlur       = Rand() < 0.15 ? RandBetween(0.1, 0.4) : 0;
-            this.chromaMode         = RandInt(4);
-            this.chromaKeyColor.Randomize(0, 1);
-            this.chromaThreshold    = RandBetween(0.01, 0.2);
-            this.chromaSoftness     = RandBetween(0.01, 0.2);
+            this.useFeedback = Rand() < 0.2 ? 1 : 0;
+            if (this.useFeedback)
+            {
+                this.feedbackBlendMode  = RandInt(9);
+                this.feedbackAmount     = RandBetween(0.80, 0.97);
+                this.feedbackMaskType   = RandInt(5);
+                this.feedbackModType    = RandInt(5);
+                this.feedbackModAmount  = RandBetween(0.1, 0.6);
+                this.feedbackOpOrder    = RandInt(6);
+                this.feedbackSwap       = Rand() < 0.3 ? 1 : 0;
+                this.feedbackSharpen    = Rand() < 0.15 ? RandBetween(0.1, 0.4) : 0;
+                this.feedbackBlur       = Rand() < 0.15 ? RandBetween(0.1, 0.4) : 0;
+                this.chromaMode         = RandInt(4);
+                this.chromaKeyColor.Randomize(0, 1);
+                this.chromaThreshold    = RandBetween(0.01, 0.2);
+                this.chromaSoftness     = RandBetween(0.01, 0.2);
+            }
         }
             
         this.MakeAllObjectFloatsFixed(this);
@@ -220,33 +223,36 @@ export class ShaderObject
             this.useTimeInLibrary = this.useTimeInLibrary ? 0 : 1;
         
         // Feedback mutations
-        if (Rand() < .08)
-            this.useFeedback = this.useFeedback ? 0 : 1;
-        if (this.useFeedback)
+        if (!state.feedbackLocked)
         {
-            if (Rand() < .15)
-                this.feedbackBlendMode = RandInt(9);
-            if (Rand() < .10)
-                this.feedbackMaskType = RandInt(5);
-            if (Rand() < .10)
-                this.feedbackModType = RandInt(5);
-            if (Rand() < .10)
-                this.feedbackOpOrder = RandInt(6);
             if (Rand() < .08)
-                this.feedbackSwap = this.feedbackSwap ? 0 : 1;
-            if (Rand() < .08)
-                this.feedbackSharpen = Clamp(this.feedbackSharpen + RandBetween(-.1, .1), 0, 1);
-            if (Rand() < .08)
-                this.feedbackBlur = Clamp(this.feedbackBlur + RandBetween(-.1, .1), 0, 1);
-            if (Rand() < .10)
+                this.useFeedback = this.useFeedback ? 0 : 1;
+            if (this.useFeedback)
             {
-                this.chromaMode = RandInt(4);
-                this.chromaKeyColor.Randomize(0, 1);
+                if (Rand() < .15)
+                    this.feedbackBlendMode = RandInt(9);
+                if (Rand() < .10)
+                    this.feedbackMaskType = RandInt(5);
+                if (Rand() < .10)
+                    this.feedbackModType = RandInt(5);
+                if (Rand() < .10)
+                    this.feedbackOpOrder = RandInt(6);
+                if (Rand() < .08)
+                    this.feedbackSwap = this.feedbackSwap ? 0 : 1;
+                if (Rand() < .08)
+                    this.feedbackSharpen = Clamp(this.feedbackSharpen + RandBetween(-.1, .1), 0, 1);
+                if (Rand() < .08)
+                    this.feedbackBlur = Clamp(this.feedbackBlur + RandBetween(-.1, .1), 0, 1);
+                if (Rand() < .10)
+                {
+                    this.chromaMode = RandInt(4);
+                    this.chromaKeyColor.Randomize(0, 1);
+                }
+                this.feedbackAmount    = Clamp(this.feedbackAmount    + RandBetween(-.05, .05), 0.5, 0.99);
+                this.feedbackModAmount = Clamp(this.feedbackModAmount + RandBetween(-.08, .08), 0.0, 1.0);
+                this.chromaThreshold   = Clamp(this.chromaThreshold   + RandBetween(-.03, .03), 0.0, 1.0);
+                this.chromaSoftness    = Clamp(this.chromaSoftness    + RandBetween(-.03, .03), 0.0, 1.0);
             }
-            this.feedbackAmount    = Clamp(this.feedbackAmount    + RandBetween(-.05, .05), 0.5, 0.99);
-            this.feedbackModAmount = Clamp(this.feedbackModAmount + RandBetween(-.08, .08), 0.0, 1.0);
-            this.chromaThreshold   = Clamp(this.chromaThreshold   + RandBetween(-.03, .03), 0.0, 1.0);
-            this.chromaSoftness    = Clamp(this.chromaSoftness    + RandBetween(-.03, .03), 0.0, 1.0);
         }
             
         this.MakeAllObjectFloatsFixed(this);

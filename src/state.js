@@ -72,6 +72,7 @@ export const state = {
     feedbackCanvasWidth: 0,             // last size; triggers FB resize
     feedbackCanvasHeight: 0,
     feedbackClearOnChange: true,        // when true, clear accum on shader change
+    feedbackLocked: false,              // when true, skip feedback mutations
     feedbackCompositeProgram: null,     // cached WebGL program for composite pass
 
     // Chroma Key UI DOM Refs
@@ -88,4 +89,5 @@ export const state = {
     span_feedbackSharpen: null,
     range_feedbackBlur: null,
     span_feedbackBlur: null,
+    checkbox_feedbackLock: null,
 };

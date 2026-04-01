@@ -41,11 +41,13 @@ function UpdateFeedbackUI()
     let modAmount     = parseFloat(state.range_feedbackModAmount.value);
     let opOrder       = parseInt(state.select_feedbackOpOrder.value);
     let doSwap        = state.checkbox_feedbackSwap.checked ? 1 : 0;
+    let feedbackLocked = state.checkbox_feedbackLock.checked;
     let clearOnChange = state.checkbox_feedbackClear.checked;
 
     state.span_feedbackAmount.textContent    = amount.toFixed(2);
     state.span_feedbackModAmount.textContent = modAmount.toFixed(2);
     state.feedbackClearOnChange = clearOnChange;
+    state.feedbackLocked        = feedbackLocked;
 
     state.favoriteShader.useFeedback        = useFeedback;
     state.favoriteShader.feedbackBlendMode  = blendMode;
@@ -138,6 +140,7 @@ function Init()
     state.span_feedbackModAmount     = document.getElementById('span_feedbackModAmount');
     state.select_feedbackOpOrder     = document.getElementById('select_feedbackOpOrder');
     state.checkbox_feedbackSwap      = document.getElementById('checkbox_feedbackSwap');
+    state.checkbox_feedbackLock      = document.getElementById('checkbox_feedbackLock');
     state.checkbox_feedbackClear     = document.getElementById('checkbox_feedbackClear');
     state.button_feedback            = document.getElementById('button_feedback');
     state.button_satelliteFeedback   = document.getElementById('button_satelliteFeedback');
