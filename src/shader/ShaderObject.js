@@ -68,8 +68,8 @@ export class ShaderObject
     
     Randomize(keepFeedback = false)
     {
-        let statementCount = parseInt(state.input_randomizeLength.value);
-        if (statementCount <0)
+        let statementCount = state.settings.randomizeLength;
+        if (statementCount < 0)
             statementCount = 0;
         
         this.usePalette = 1;

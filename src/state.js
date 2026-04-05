@@ -1,62 +1,39 @@
+import { reactive, shallowReactive } from 'vue';
+
 // Global State Variables for ZzArt
-export const state = {
-    canvasContext_main: null,
-    canvasContext_save: null,
-    canvasContext_shader: null,
-    defaultCanvasWidth: 1920,
-    defaultCanvasHeight: 1080,
+export const state = reactive({
+    // Render Contexts (using shallowReactive to avoid deep tracking of WebGL internals)
+    contexts: shallowReactive({
+        main: null,
+        save: null,
+        shader: null,
+    }),
+    
+    // Core Configuration
+    config: {
+        defaultWidth: 1920,
+        defaultHeight: 1080,
+        maxIterations: 9,
+        dataVersion: 3,
+    },
+    
+    // Application State
     shaderMemory: [],
     shaderGrid: [],
     gridSize: 5,
-    favoriteShader: null, // this gets set to an object
+    favoriteShader: null,
     shaderMemoryLocation: 0,
-    showPreview: 0,
-    advancedMode: 0,
-    rotateCanvas: 0,
-    dataVersion: 3,
-    itchMode: 0,
+    showPreview: false,
+    advancedMode: false,
+    rotateCanvas: false,
+    itchMode: false,
     satelliteMode: 0,
     startIterations: 1,
     uniqueID: 0,
-    isInit: 0,
+    isInit: false,
     time: 0,
-    maxIterations: 9,
     vertexShader: 0,
     lastSatelliteUpdate: 0,
-    
-    // UI DOM Refs
-    canvas_main: null,
-    canvas_save: null,
-    canvas_shader: null,
-    buttons_top: null,
-    div_credit: null,
-    div_title: null,
-    div_satellite: null,
-    span_generationsSatellite: null,
-    span_generations: null,
-    
-    button_back: null,
-    button_forward: null,
-    button_preview: null,
-    button_delete: null,
-    button_help: null,
-    button_seed: null,
-    button_advanced: null,
-    button_share: null,
-    button_openSatellite: null,
-    button_saveFolder: null,
-    
-    div_advanced: null,
-    textarea_debug: null,
-    select_saveList: null,
-    input_startIterations: null,
-    checkbox_showWatermark: null,
-    input_saveScale: null,
-    input_gridSize: null,
-    input_randomizeLength: null,
-    input_importFile: null,
-    textarea_code: null,
-    textarea_json: null,
     
     // Lists and storage
     saveList: [],
@@ -67,43 +44,52 @@ export const state = {
     randSeed: Date.now(),
 
     // Feedback / compositing (ping-pong framebuffers)
-    feedbackFramebuffers: [null, null, null],  // [raw, historyA, historyB] WebGLFramebuffer
-    feedbackTextures: [null, null, null],      // colour attachments
-    feedbackIndex: 0,                    // which slot is "previous"
-    feedbackCanvasWidth: 0,             // last size; triggers FB resize
-    feedbackCanvasHeight: 0,
-    feedbackClearOnChange: true,        // when true, clear accum on shader change
-    feedbackLocked: false,              // when true, skip feedback mutations
-    feedbackCompositeProgram: null,     // cached WebGL program for composite pass
-
-    // Chroma Key UI DOM Refs
-    select_feedbackChromaMode: null,
-    input_feedbackChromaKeyColor: null,
-    range_feedbackChromaThreshold: null,
-    span_feedbackChromaThreshold: null,
-    range_feedbackChromaSoftness: null,
-    span_feedbackChromaSoftness: null,
-    div_chromaSettings: null,
-
-    // Post-Proc UI DOM Refs
-    range_feedbackSharpen: null,
-    span_feedbackSharpen: null,
-    range_feedbackBlur: null,
-    span_feedbackBlur: null,
-    checkbox_feedbackLock: null,
-
-    // Pipeline Viewer DOM Refs
-    div_pipelineSourceCode: null,
-    div_pipelineFeedbackCode: null,
-    div_feedbackLoopContainer: null,
-    svg_feedbackLoopPath: null,
-    div_nodeCompositorParams: null,
-    div_bufferHistoryNodes: null,
-    div_pipelineOutputConnection: null,
+    feedback: {
+        framebuffers: [null, null, null],
+        textures: [null, null, null],
+        index: 0,
+        canvasWidth: 0,
+        canvasHeight: 0,
+        clearOnChange: true,
+        locked: false,
+        compositeProgram: null,
+    },
 
     // Async Grid Render State
-    gridRenderQueue: [],       // list of [X, Y] coordinates
-    gridRenderRecords: [],     // flat list or Map of {x, y, canvas, opacity, rendered}
-    isRenderingGrid: false,    // flag to keep loop alive
-    gridRenderId: 0,           // used to cancel old render loops
-};
+    gridRender: {
+        queue: [],
+        records: [], // {x, y, canvas, opacity, rendered}
+        isRendering: false,
+        id: 0,
+    },
+
+    // Settings that were updated via cookies/storage
+    settings: {
+        showWatermark: false,
+        saveScale: 2,
+        randomizeLength: 15,
+    },
+
+    // UI helper for raw code viewing
+    ui: {
+        textareaDebug: '',
+        textareaCode: '',
+        textareaJson: '',
+    }
+});
+
+// Legacy mapping for compatibility with existing modules during transition
+// We will gradually remove these and access via state.*
+Object.defineProperty(state, 'canvasContext_main',   { get: () => state.contexts.main,   set: (v) => state.contexts.main = v });
+Object.defineProperty(state, 'canvasContext_save',   { get: () => state.contexts.save,   set: (v) => state.contexts.save = v });
+Object.defineProperty(state, 'canvasContext_shader', { get: () => state.contexts.shader, set: (v) => state.contexts.shader = v });
+Object.defineProperty(state, 'defaultCanvasWidth',   { get: () => state.config.defaultWidth });
+Object.defineProperty(state, 'defaultCanvasHeight',  { get: () => state.config.defaultHeight });
+Object.defineProperty(state, 'maxIterations',        { get: () => state.config.maxIterations });
+
+// Feedback aliases
+Object.defineProperty(state, 'feedbackClearOnChange', { get: () => state.feedback.clearOnChange, set: (v) => state.feedback.clearOnChange = v });
+Object.defineProperty(state, 'feedbackLocked',        { get: () => state.feedback.locked,        set: (v) => state.feedback.locked = v });
+Object.defineProperty(state, 'gridRenderId',          { get: () => state.gridRender.id,          set: (v) => state.gridRender.id = v });
+Object.defineProperty(state, 'gridRenderQueue',       { get: () => state.gridRender.queue,       set: (v) => state.gridRender.queue = v });
+Object.defineProperty(state, 'gridRenderRecords',     { get: () => state.gridRender.records,     set: (v) => state.gridRender.records = v });

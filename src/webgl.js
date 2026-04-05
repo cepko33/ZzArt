@@ -5,7 +5,7 @@ const programCache = {};
 
 export function InitWebgl() 
 {
-    let x = state.canvasContext_shader;
+    let x = state.contexts.shader;
 
     // create simple pass-through vertex shader (shared by all programs)
     state.vertexShader = x.createShader(x.VERTEX_SHADER);
@@ -15,7 +15,7 @@ export function InitWebgl()
     if (!compiled)
     {
         let shaderLog = x.getShaderInfoLog(state.vertexShader);
-        state.textarea_debug.value = "VERTEX SHADER ERROR!\n" + shaderLog;
+        state.ui.textareaDebug = "VERTEX SHADER ERROR!\n" + shaderLog;
         state.vertexShader = 0;
         return;
     }
@@ -54,45 +54,43 @@ function _makeFBO(x, tex)
 
 /**
  * (Re)create the two ping-pong framebuffers to match the current canvas size.
- * Safe to call multiple times – old textures/FBOs are deleted first.
  */
 export function InitFeedbackBuffers()
 {
-    let x = state.canvasContext_shader;
+    let x = state.contexts.shader;
     let w = state.canvas_shader.width;
     let h = state.canvas_shader.height;
 
     // destroy old resources
     for (let i = 0; i < 3; i++)
     {
-        if (state.feedbackTextures[i])    x.deleteTexture(state.feedbackTextures[i]);
-        if (state.feedbackFramebuffers[i]) x.deleteFramebuffer(state.feedbackFramebuffers[i]);
+        if (state.feedback.textures[i])    x.deleteTexture(state.feedback.textures[i]);
+        if (state.feedback.framebuffers[i]) x.deleteFramebuffer(state.feedback.framebuffers[i]);
     }
 
     // create new resources
     for (let i = 0; i < 3; i++)
     {
-        state.feedbackTextures[i]    = _makeColorTex(x, w, h);
-        state.feedbackFramebuffers[i] = _makeFBO(x, state.feedbackTextures[i]);
+        state.feedback.textures[i]    = _makeColorTex(x, w, h);
+        state.feedback.framebuffers[i] = _makeFBO(x, state.feedback.textures[i]);
     }
 
-    state.feedbackCanvasWidth  = w;
-    state.feedbackCanvasHeight = h;
-    state.feedbackCompositeProgram = null; // invalidate cached composite program
+    state.feedback.canvasWidth  = w;
+    state.feedback.canvasHeight = h;
+    state.feedback.compositeProgram = null; 
 }
 
 /**
  * Clear both ping-pong buffers to transparent black.
- * Call this when the active shader changes and feedbackClearOnChange is true.
  */
 export function ClearFeedback()
 {
-    let x = state.canvasContext_shader;
-    if (!state.feedbackFramebuffers[0]) return;
+    let x = state.contexts.shader;
+    if (!state.feedback.framebuffers[0]) return;
 
     for (let i = 0; i < 3; i++)
     {
-        x.bindFramebuffer(x.FRAMEBUFFER, state.feedbackFramebuffers[i]);
+        x.bindFramebuffer(x.FRAMEBUFFER, state.feedback.framebuffers[i]);
         x.clearColor(0, 0, 0, 0);
         x.clear(x.COLOR_BUFFER_BIT);
     }
@@ -108,7 +106,7 @@ function _compileFragment(x, src)
     x.compileShader(sh);
     if (!x.getShaderParameter(sh, x.COMPILE_STATUS))
     {
-        state.textarea_debug.value = "FRAGMENT SHADER ERROR!\n" + x.getShaderInfoLog(sh);
+        state.ui.textareaDebug = "FRAGMENT SHADER ERROR!\n" + x.getShaderInfoLog(sh);
         return null;
     }
     return sh;
@@ -122,7 +120,7 @@ function _linkProgram(x, fragShader)
     x.linkProgram(prog);
     if (!x.getProgramParameter(prog, x.LINK_STATUS))
     {
-        state.textarea_debug.value = "LINK ERROR!\n" + x.getProgramInfoLog(prog);
+        state.ui.textareaDebug = "LINK ERROR!\n" + x.getProgramInfoLog(prog);
         return null;
     }
     return prog;
@@ -144,23 +142,11 @@ function _getOrCreateProgram(x, src)
 
 // ── Main render entry point ────────────────────────────────────────────────
 
-/**
- * Render one frame.
- *
- * @param {string}  code            - GLSL fragment body (mainImage)
- * @param {object}  [feedbackOpts]  - if present, enables the two-pass path:
- *   {
- *     useFeedback:      boolean,
- *     feedbackBlendMode: number 0–7,
- *     feedbackAmount:    number 0–1,
- *     feedbackMaskType:  number 0–4,
- *   }
- */
 export function RenderShader(code, feedbackOpts)
 {
     if (!state.vertexShader) return;
 
-    let x = state.canvasContext_shader;
+    let x = state.contexts.shader;
     let w = state.canvas_shader.width;
     let h = state.canvas_shader.height;
 
@@ -182,31 +168,18 @@ export function RenderShader(code, feedbackOpts)
     if (feedback)
     {
         // ── Resize ping-pong buffers if canvas changed ───────────────────────
-        if (w !== state.feedbackCanvasWidth || h !== state.feedbackCanvasHeight)
+        if (w !== state.feedback.canvasWidth || h !== state.feedback.canvasHeight)
         {
             InitFeedbackBuffers();
-            state.feedbackIndex = 1; // Default to first history slot
+            state.feedback.index = 1; 
         }
 
-        /**
-         * 3-Buffer Accumulation Logic
-         * Buffer 0: "Raw" current frame output
-         * Buffer 1: History A
-         * Buffer 2: History B
-         * 
-         * 1. Render mainImage -> Buffer 0
-         * 2. prevIdx = state.feedbackIndex (1 or 2)
-         * 3. nextIdx = 1 if prevIdx == 2 else 2
-         * 4. Composite (Buffer 0 + Buffer[prevIdx]) -> Buffer[nextIdx]
-         * 5. Blit Buffer[nextIdx] to Screen
-         * 6. feedbackIndex = nextIdx
-         */
         const rawIdx  = 0;
-        const prevIdx = state.feedbackIndex === 1 || state.feedbackIndex === 2 ? state.feedbackIndex : 1;
+        const prevIdx = state.feedback.index === 1 || state.feedback.index === 2 ? state.feedback.index : 1;
         const nextIdx = prevIdx === 1 ? 2 : 1;
 
         // ── Pass 1: render mainImage → raw FBO (0) ───────────────────────────
-        x.bindFramebuffer(x.FRAMEBUFFER, state.feedbackFramebuffers[rawIdx]);
+        x.bindFramebuffer(x.FRAMEBUFFER, state.feedback.framebuffers[rawIdx]);
         x.viewport(0, 0, w, h);
         x.useProgram(mainProg);
         x.uniform1f(x.getUniformLocation(mainProg, 'iTime'), state.time);
@@ -225,21 +198,18 @@ export function RenderShader(code, feedbackOpts)
         let compProg = _getOrCreateProgram(x, compSrc);
 
         // ── Pass 2: composite → next history FBO ─────────────────────────────
-        x.bindFramebuffer(x.FRAMEBUFFER, state.feedbackFramebuffers[nextIdx]);
+        x.bindFramebuffer(x.FRAMEBUFFER, state.feedback.framebuffers[nextIdx]);
         x.viewport(0, 0, w, h);
         x.useProgram(compProg);
 
-        // bind textures — optionally swap curr/prev roles
         const swap    = feedbackOpts.feedbackSwap;
-        const texA    = swap ? state.feedbackTextures[prevIdx] : state.feedbackTextures[rawIdx];
-        const texB    = swap ? state.feedbackTextures[rawIdx]  : state.feedbackTextures[prevIdx];
+        const texA    = swap ? state.feedback.textures[prevIdx] : state.feedback.textures[rawIdx];
+        const texB    = swap ? state.feedback.textures[rawIdx]  : state.feedback.textures[prevIdx];
 
-        // iCurrent
         x.activeTexture(x.TEXTURE0);
         x.bindTexture(x.TEXTURE_2D, texA);
         x.uniform1i(x.getUniformLocation(compProg, 'iCurrent'), 0);
 
-        // iPrevious (last frame's accumulated result)
         x.activeTexture(x.TEXTURE1);
         x.bindTexture(x.TEXTURE_2D, texB);
         x.uniform1i(x.getUniformLocation(compProg, 'iPrevious'), 1);
@@ -248,7 +218,6 @@ export function RenderShader(code, feedbackOpts)
         x.uniform1f(x.getUniformLocation(compProg, 'iFeedbackModAmount'), feedbackOpts.feedbackModAmount ?? 0);
         x.uniform1f(x.getUniformLocation(compProg, 'iTime'),              state.time);
 
-        // Chroma Key uniforms
         const key = feedbackOpts.chromaKeyColor || {x:0, y:1, z:0};
         x.uniform3f(x.getUniformLocation(compProg, 'iChromaKeyColor'), key.x, key.y, key.z);
         x.uniform1f(x.getUniformLocation(compProg, 'iChromaThreshold'), feedbackOpts.chromaThreshold ?? 0.1);
@@ -265,12 +234,11 @@ export function RenderShader(code, feedbackOpts)
         let blitProg = _getOrCreateProgram(x, blitFullSrc);
         x.useProgram(blitProg);
         x.activeTexture(x.TEXTURE0);
-        x.bindTexture(x.TEXTURE_2D, state.feedbackTextures[nextIdx]);
+        x.bindTexture(x.TEXTURE_2D, state.feedback.textures[nextIdx]);
         x.uniform1i(x.getUniformLocation(blitProg, 'iChannel0'), 0);
         x.drawArrays(x.TRIANGLE_FAN, 0, 3);
 
-        // ── Commit: the frame we just rendered into nextIdx is now "history" ──
-        state.feedbackIndex = nextIdx;
+        state.feedback.index = nextIdx;
     }
     else
     {

@@ -1,6 +1,6 @@
 import { state } from './state';
 import { ShaderObject } from './shader/ShaderObject';
-import { UpdateUI, DrawShaders, SetFavoriteFromMemory, DisplaySaveListPage, SetGridSize } from './ui/ui';
+import { UpdateUI, DrawShaders, SetFavoriteFromMemory, DisplaySaveListPage } from './ui/ui';
 import download from './utils/download';
 import { setCookie, getCookie } from './utils/cookie';
 
@@ -12,30 +12,32 @@ export function SaveLocalStorage()
     let shader = state.shaderMemory[state.shaderMemoryLocation];
     let saveData = 
     {
-        version: state.dataVersion,
-        showWatermark: state.checkbox_showWatermark.checked,
+        version: state.config.dataVersion,
+        showWatermark: state.settings.showWatermark,
         advancedMode: state.advancedMode,
         gridSize: state.gridSize,
         favorite: shader,
         lastUpdate: Date.now()
     }
         
-    localStorage.version = state.dataVersion;
+    localStorage.version = state.config.dataVersion;
     localStorage.saveData = JSON.stringify(saveData);
 }
 
 export function LoadLocalStorage()
 {
-    if (localStorage.version != state.dataVersion)
+    if (localStorage.version != state.config.dataVersion)
         return;
         
     let saveData = JSON.parse(localStorage.saveData);
-    state.checkbox_showWatermark.checked = saveData.showWatermark;
+    state.settings.showWatermark = saveData.showWatermark;
     state.advancedMode = saveData.advancedMode;
-    state.input_gridSize.value = state.gridSize = saveData.gridSize;
+    state.gridSize = saveData.gridSize;
     
     let rawObject = saveData.favorite;
-    state.favoriteShader = Object.assign(new ShaderObject(), rawObject).Clone();
+    if (rawObject) {
+        state.favoriteShader = Object.assign(new ShaderObject(), rawObject).Clone();
+    }
 }
 
 export function SaveSettingsToCookie()
@@ -44,11 +46,11 @@ export function SaveSettingsToCookie()
         return;
 
     let settings = {
-        showWatermark: state.checkbox_showWatermark.checked,
-        feedbackClear: state.checkbox_feedbackClear.checked,
-        saveScale: state.input_saveScale.value,
-        gridSize: state.input_gridSize.value,
-        startIterations: state.input_startIterations.value,
+        showWatermark: state.settings.showWatermark,
+        feedbackClear: state.feedback.clearOnChange,
+        saveScale: state.settings.saveScale,
+        gridSize: state.gridSize,
+        startIterations: state.startIterations,
         advancedMode: state.advancedMode
     };
 
@@ -62,23 +64,19 @@ export function LoadSettingsFromCookie()
 
     try {
         let settings = JSON.parse(cookie);
-        if (settings.showWatermark !== undefined) state.checkbox_showWatermark.checked = settings.showWatermark;
+        if (settings.showWatermark !== undefined) state.settings.showWatermark = settings.showWatermark;
         if (settings.feedbackClear !== undefined) {
-            state.checkbox_feedbackClear.checked = settings.feedbackClear;
-            state.feedbackClearOnChange = settings.feedbackClear;
+            state.feedback.clearOnChange = settings.feedbackClear;
         }
-        if (settings.saveScale !== undefined) state.input_saveScale.value = settings.saveScale;
+        if (settings.saveScale !== undefined) state.settings.saveScale = settings.saveScale;
         if (settings.gridSize !== undefined) {
-            state.input_gridSize.value = settings.gridSize;
             state.gridSize = parseInt(settings.gridSize);
         }
         if (settings.startIterations !== undefined) {
-            state.input_startIterations.value = settings.startIterations;
             state.startIterations = parseInt(settings.startIterations);
         }
         if (settings.advancedMode !== undefined) {
             state.advancedMode = settings.advancedMode;
-            // advancedMode toggle usually handled by ButtonAdvanced, but we'll apply it here
         }
     } catch (e) {
         console.error("Failed to parse settings cookie", e);
@@ -94,7 +92,7 @@ export function LoadSavedShaderList()
         savedShaderCount = 0;
         return;
     }
-    for(let i=0;i<savedShaderCount;++i)
+    for(let i=0; i<savedShaderCount; ++i)
     {
         let rawObject = localStorage['savedShader_'+i];
         if (!rawObject)
@@ -135,7 +133,7 @@ export function SelectSavedShader(i)
     SetFavoriteFromMemory();
     
     DrawShaders();
-    UpdateUI(0);
+    UpdateUI();
 }
 
 export function AddToSaveList(shader, save=1)
@@ -145,14 +143,10 @@ export function AddToSaveList(shader, save=1)
     if (matches.length)
         return;
 
-    let i = state.saveList.length;
-    let option = document.createElement('option');
-    option.value = i;
-    option.innerHTML = shader.GetGenerationString(1);
-    state.select_saveList.appendChild(option);
     state.saveList.push(shader.Clone());
     if (save)
     {
+        let i = state.saveList.length - 1;
         localStorage['savedShader_'+i] = JSON.stringify(shader);
         localStorage.savedShaderCount = state.saveList.length;
     }
@@ -160,26 +154,18 @@ export function AddToSaveList(shader, save=1)
 
 export function DeleteSelectedSave()
 {
-    let options = state.select_saveList.getElementsByTagName('option');
-    let i = state.select_saveList.selectedIndex;
-    if (i < 0 || i >= options.length)
-    {
-        // check if current favorite
-        i = 0;
-        for (let shader of state.saveList)
-        {
-            if (shader.uniqueID == state.favoriteShader.uniqueID)
-                break;
-                
-            ++i;
-        }
-        
-        if (i == state.saveList.length)
-            return;
-    }
+    // If we have a selection in the UI (managed by state logic or component)
+    // For now we use the favorite shader uniqueID to find it if no index passed
+    // But usually this is called from SelectSavedShader or a specific UI action
+    
+    // Legacy logic used select_saveList.selectedIndex
+    // In Vue, we should probably pass the index or use a reactive selection
+    // For now, let's assume we delete the current favorite if it's in the list
+    
+    let i = state.saveList.findIndex(s => s.uniqueID === state.favoriteShader?.uniqueID);
+    if (i === -1) return;
     
     state.saveList.splice(i, 1);
-    options[i].remove();
     SaveShaderList();
     UpdateUI();
 }
@@ -201,11 +187,10 @@ export function ImportSaveList(file)
         
     let reader = new FileReader();
     reader.readAsText(file,'UTF-8');
-    reader.onload=readerEvent=>
+    reader.onload = readerEvent =>
     {
         state.saveList = [];
         state.saveListIndex = 0;
-        state.select_saveList.options.length = 0;
             
         let content = readerEvent.target.result;
         let jsonLines = content.split('\n');
@@ -226,7 +211,7 @@ export function ImportSaveList(file)
         SaveShaderList();
         DisplaySaveListPage(0);
         
-        state.shaderMemoryLocation=0;
+        state.shaderMemoryLocation = 0;
         state.shaderMemory.length = state.shaderMemoryLocation;
         state.shaderMemory.push(state.favoriteShader.Clone());
         UpdateUI();
