@@ -5,7 +5,8 @@
  * This file aggregates functions from the src/shader/lib/ directory.
  */
 
-import { MATH_FUNCTIONS } from './lib/math';
+import { ShaderBuilder } from "./ShaderBuilder";
+import { MATH_FUNCTIONS } from "./lib/math";
 import { DOMAIN_FUNCTIONS } from './lib/domain';
 import { NOISE_FUNCTIONS } from './lib/noise';
 import { SDF_FUNCTIONS } from './lib/sdf';
@@ -54,25 +55,27 @@ export function collectUsedLibNames(statements) {
  * Emit the GLSL preamble for a shader.
  */
 export function buildPreamble(usedNames, usePalette, useTimeInLib) {
-  let out = `const float PI = 3.141592653589793;\n`;
+  const sb = new ShaderBuilder();
 
+  sb.header("Constants");
+  sb.add("const float PI = 3.141592653589793;");
+
+  sb.header("Library Functions");
   for (const fn of SHADER_LIB_FUNCTIONS) {
-    if (fn.name === 'CosinePalette' || fn.name === 'SmoothHSV') continue;
+    if (fn.name === "CosinePalette" || fn.name === "SmoothHSV") continue;
     if (!usedNames.has(fn.name)) continue;
 
-    const body = (useTimeInLib && fn.bodyTimed) ? fn.bodyTimed : fn.body;
-    out += body + '\n';
+    const body = useTimeInLib && fn.bodyTimed ? fn.bodyTimed : fn.body;
+    sb.add(body);
   }
 
-  // Palette / color-space helper
-  if (usePalette) {
-    const fn = SHADER_LIB_FUNCTIONS.find(f => f.name === 'CosinePalette');
-    out += ((useTimeInLib && fn.bodyTimed) ? fn.bodyTimed : fn.body) + '\n';
-  } else {
-    const fn = SHADER_LIB_FUNCTIONS.find(f => f.name === 'SmoothHSV');
-    out += ((useTimeInLib && fn.bodyTimed) ? fn.bodyTimed : fn.body) + '\n';
+  sb.header("Color Palette Helpers");
+  const paletteFnName = usePalette ? "CosinePalette" : "SmoothHSV";
+  const paletteFn = SHADER_LIB_FUNCTIONS.find((f) => f.name === paletteFnName);
+  if (paletteFn) {
+    const body = useTimeInLib && paletteFn.bodyTimed ? paletteFn.bodyTimed : paletteFn.body;
+    sb.add(body);
   }
 
-  out += '\n';
-  return out;
+  return sb.toString();
 }

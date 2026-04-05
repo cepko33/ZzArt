@@ -7,14 +7,21 @@ export const shaderRandomizer = {
     return f[RandInt(f.length)];
   },
   FunctionName: function () {
-    if (Rand() < 0.5) return "";
+    if (Rand() < 0.1) return "";
 
     // Built-in GLSL functions that need no stdlib wrapper
     const builtins = [
-      "sin", "cos", "tan",
-      "atan", "exp", "exp2",
-      "fract", "abs", "sign",
-      "floor", "ceil",
+      "sin",
+      "cos",
+      "tan",
+      "atan",
+      "exp",
+      "exp2",
+      "fract",
+      "abs",
+      "sign",
+      "floor",
+      "ceil",
       "normalize",
     ];
 
@@ -130,22 +137,36 @@ export class ShaderStatement {
     this.valueW += 0.05 * RandBetween(-1, 1);
   }
 
-  GetString() {
-    let parameter = "" + this.parameter;
-    if (parameter == "") {
-      let vx = this.timeUsage === 1 ? "iTime" : this.valueX.toFixed(3);
-      let vy = this.timeUsage === 2 ? "iTime" : this.valueY.toFixed(3);
-      let vz = this.timeUsage === 3 ? "iTime" : this.valueZ.toFixed(3);
-      let vw = this.timeUsage === 4 ? "iTime" : this.valueW.toFixed(3);
-      parameter = `vec4(${vx}, ${vy}, ${vz}, ${vw})`;
-    }
+  /**
+   * Internal helper to format the vec4(x, y, z, w) parameter from individual values.
+   */
+  _getFormattedVec4() {
+    const format = (v, usage, timeIndex) =>
+      usage === timeIndex ? "iTime" : v.toFixed(3);
 
-    let code;
-    code = this.output + "." + this.outputSwizzle;
-    code += " " + this.assignmentOperator + " " + this.functionName;
-    code += "(" + parameter + ")";
-    code += "." + this.parameterSwizzle;
-    code += ";";
-    return code;
+    const x = format(this.valueX, this.timeUsage, 1);
+    const y = format(this.valueY, this.timeUsage, 2);
+    const z = format(this.valueZ, this.timeUsage, 3);
+    const w = format(this.valueW, this.timeUsage, 4);
+
+    return `vec4(${x}, ${y}, ${z}, ${w})`;
+  }
+
+  /**
+   * Generate the GLSL statement string.
+   */
+  GetGLSL() {
+    const parameter =
+      this.parameter === "" ? this._getFormattedVec4() : this.parameter;
+
+    // Structure: output.swizzle operator function(parameter).swizzle;
+    return `${this.output}.${this.outputSwizzle} ${this.assignmentOperator} ${this.functionName}(${parameter}).${this.parameterSwizzle};`;
+  }
+
+  /**
+   * Legacy alias for GetGLSL
+   */
+  GetString() {
+    return this.GetGLSL();
   }
 }

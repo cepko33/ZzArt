@@ -8,6 +8,7 @@ import {
   Vector3,
 } from "../utils/math";
 import { ShaderStatement } from "./ShaderStatement";
+import { ShaderBuilder } from "./ShaderBuilder";
 import { buildPreamble, collectUsedLibNames } from "./ShaderLibrary";
 import { RenderShader, ClearFeedback } from "../webgl";
 
@@ -272,57 +273,91 @@ export class ShaderObject {
     this.MakeAllObjectFloatsFixed(this);
   }
 
+  /**
+   * Generates the final GLSL shader source code.
+   * This uses the ShaderBuilder utility for structured, readable code output.
+   */
   GetCode() {
-    const s = 10;
-    const uvsx = (s * this.uvScaleX).toFixed(3);
-    const uvsy = (s * this.uvScaleY).toFixed(3);
-    const uvox = (s * this.uvOffsetX).toFixed(3);
-    const uvoy = (s * this.uvOffsetY).toFixed(3);
+    const sb = new ShaderBuilder();
     const useTimeInLib = !!this.useTimeInLibrary;
+    const usedNames = collectUsedLibNames(this.shaderStatements);
+
+    // ── Metadata ────────────────────────────────────────────────────────
+    sb.add(`// ZzArt - ${this.GetGenerationString()}`);
+    if (useTimeInLib) sb.add(`// (library time-mode enabled)`);
+    sb.add();
 
     // ── Preamble ────────────────────────────────────────────────────────
-    const usedNames = collectUsedLibNames(this.shaderStatements);
-    let code = `// ZzArt - ${this.GetGenerationString()}\n`;
-    if (useTimeInLib) code += `// (library time-mode enabled)\n`;
-    code += `\n`;
-    code += buildPreamble(usedNames, this.usePalette, useTimeInLib);
+    sb.add(buildPreamble(usedNames, this.usePalette, useTimeInLib));
 
-    // ── Main body ───────────────────────────────────────────────────────
+    // ── Main logic ──────────────────────────────────────────────────────
+    const s = 10;
+    const uvsx = sb.float(s * this.uvScaleX);
+    const uvsy = sb.float(s * this.uvScaleY);
+    const uvox = sb.float(s * this.uvOffsetX);
+    const uvoy = sb.float(s * this.uvOffsetY);
     const rotateSwizzle = state.rotateCanvas ^ this.rotate ? "yxyx" : "xyxy";
-    code += `void mainImage(out vec4 a, in vec2 p)\n{\n`;
-    code += `a = p.${rotateSwizzle} / iResolution.${rotateSwizzle};\n`;
-    code += `a.xywz *= vec2(${uvsx}, ${uvsy}).xyxy;\n`;
-    code += `a.xywz += vec2(${uvox}, ${uvoy}).xyxy;\n`;
-    code += `a.w = 1.0; // Initialize alpha\n`;
-    code += `vec4 b = a;\n\n`;
-    code += `// Generated statements: ${this.shaderStatements.length}\n`;
 
-    if (this.shaderStatements.length === 0) {
-      code += `b = a = vec4(0.0);\n`;
-    } else {
-      if (this.iterationCount > 1)
-        code += `for (int i = 0; i < ${this.iterationCount}; ++i) {\n`;
-      for (const statement of this.shaderStatements)
-        code += statement.GetString() + "\n";
-      if (this.iterationCount > 1) code += `}\n`;
-    }
+    sb.block("void mainImage(out vec4 a, in vec2 p)", (main) => {
+      main.header("Coordinate Transformation");
+      main.add(`a = p.${rotateSwizzle} / iResolution.${rotateSwizzle};`);
+      main.add(`a.xywz *= vec2(${uvsx}, ${uvsy}).xyxy;`);
+      main.add(`a.xywz += vec2(${uvox}, ${uvoy}).xyxy;`);
+      main.add("a.w = 1.0; // Initialize alpha");
+      main.add("vec4 b = a;");
 
-    // ── Colorization ────────────────────────────────────────────────────
+      main.header(`Generated statements: ${this.shaderStatements.length}`);
+      if (this.shaderStatements.length === 0) {
+        main.add("b = a = vec4(0.0);");
+      } else {
+        const statementsLogic = () => {
+          for (const statement of this.shaderStatements) {
+            main.add(statement.GetGLSL());
+          }
+        };
+
+        if (this.iterationCount > 1) {
+          main.block(
+            `for (int i = 0; i < ${this.iterationCount}; ++i)`,
+            statementsLogic,
+          );
+        } else {
+          statementsLogic();
+        }
+      }
+
+      this._addColorizationCode(main);
+    });
+
+    return sb.toString();
+  }
+
+  /**
+   * Internal helper to append colorization logic to the builder.
+   * @private
+   */
+  _addColorizationCode(sb) {
     if (this.usePalette) {
-      code += `\n// Cosine palettes by iq\n`;
-      code += `a.x = a.x * ${(this.hueScale * 0.1).toFixed(3)} + ${this.hueOffset.toFixed(3)};\n`;
-      code += `a.xyz = b.x * CosinePalette(a.x`;
-      for (const color of this.paletteColors)
-        code += `,\n    ${color.GetShaderCode()}`;
-      code += `);\n`;
+      sb.header("Colorization (Cosine Palette)");
+      sb.add(
+        `a.x = a.x * ${sb.float(this.hueScale * 0.1)} + ${sb.float(this.hueOffset)};`,
+      );
+      sb.add("a.xyz = b.x * CosinePalette(a.x,");
+      sb.indent();
+      this.paletteColors.forEach((color, i) => {
+        const isLast = i === this.paletteColors.length - 1;
+        sb.add(`${color.GetShaderCode()}${isLast ? "" : ","}`);
+      });
+      sb.outdent();
+      sb.add(");");
     } else {
-      code += `\n// Smooth HSV by iq\n`;
-      code += `a.x = a.x * ${this.hueScale.toFixed(3)} + ${this.hueOffset.toFixed(3)};\n`;
-      code += `a.y *= ${this.saturationScale.toFixed(3)};\n`;
-      code += `a.xyz = SmoothHSV(a.xyz);\n`;
+      sb.header("Colorization (Smooth HSV)");
+      sb.add(
+        `a.x = a.x * ${sb.float(this.hueScale)} + ${sb.float(this.hueOffset)};`,
+      );
+      sb.add(`a.y *= ${sb.float(this.saturationScale)};`);
+      sb.add("a.xyz = SmoothHSV(a.xyz);");
     }
-    code += `}`;
-    return code;
   }
 
   /**
