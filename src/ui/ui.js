@@ -5,7 +5,7 @@ import { AddToSaveList, DeleteSelectedSave, ExportSaveList, SaveLocalStorage, Sa
 import download from '../utils/download';
 import { JSONCrush } from '../utils/jsonCrush';
 import { ClearFeedback } from '../webgl';
-import { buildCompositeShader } from '../shader/ShaderLibrary';
+import { buildCompositeShader } from '../shader/CompositeShader';
 
 /**
  * Updates feedback settings in favoriteShader from reactive state.

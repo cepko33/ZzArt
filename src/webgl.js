@@ -1,5 +1,5 @@
 import { state } from './state';
-import { buildCompositeShader } from './shader/ShaderLibrary';
+import { buildCompositeShader } from './shader/CompositeShader';
 
 const programCache = {};
 
@@ -196,6 +196,7 @@ export function RenderShader(code, feedbackOpts)
             w, h
         );
         let compProg = _getOrCreateProgram(x, compSrc);
+        if (!compProg) return;
 
         // ── Pass 2: composite → next history FBO ─────────────────────────────
         x.bindFramebuffer(x.FRAMEBUFFER, state.feedback.framebuffers[nextIdx]);
