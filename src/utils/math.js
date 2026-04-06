@@ -42,6 +42,24 @@ export function ShuffleArray(array)
 
     return array;
 }
+
+/**
+ * Perform weighted random selection from an array of choices.
+ * @param {Array<{value: any, weight: number}>} choices
+ * @returns {any}
+ */
+export function WeightedChoice(choices) {
+    let totalWeight = 0;
+    for (const choice of choices) {
+        totalWeight += choice.weight || 1;
+    }
+    let r = Rand(totalWeight);
+    for (const choice of choices) {
+        r -= choice.weight || 1;
+        if (r <= 0) return choice.value;
+    }
+    return choices[0].value;
+}
     
 export class Vector3 
 {

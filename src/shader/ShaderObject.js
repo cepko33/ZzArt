@@ -179,13 +179,13 @@ export class ShaderObject {
       this.shaderStatements.splice(r, 0, s);
     }
 
-    for (let i = RandInt(2); i--; ) {
+    for (let i = RandInt(4); i--; ) {
       // mutate statements
       let r = RandInt(this.shaderStatements.length);
       this.shaderStatements[r].Mutate();
     }
 
-    if (Rand() < 0.2) {
+    if (Rand() < 0.7) {
       // insert random statement
       let statement = new ShaderStatement();
       statement.Randomize();
@@ -224,7 +224,7 @@ export class ShaderObject {
 
     // Feedback mutations
     if (!state.feedbackLocked) {
-      if (Rand() < 0.08) this.useFeedback = this.useFeedback ? 0 : 1;
+      if (Rand() < 0.01) this.useFeedback = this.useFeedback ? 0 : 1;
       if (this.useFeedback) {
         if (Rand() < 0.15) this.feedbackBlendMode = RandInt(9);
         if (Rand() < 0.1) this.feedbackMaskType = RandInt(5);

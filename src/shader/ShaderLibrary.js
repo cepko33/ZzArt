@@ -7,10 +7,10 @@
 
 import { ShaderBuilder } from "./ShaderBuilder";
 import { MATH_FUNCTIONS } from "./lib/math";
-import { DOMAIN_FUNCTIONS } from './lib/domain';
-import { NOISE_FUNCTIONS } from './lib/noise';
-import { SDF_FUNCTIONS } from './lib/sdf';
-import { COLOR_FUNCTIONS } from './lib/color';
+import { DOMAIN_FUNCTIONS } from "./lib/domain";
+import { NOISE_FUNCTIONS } from "./lib/noise";
+import { SDF_FUNCTIONS } from "./lib/sdf";
+import { COLOR_FUNCTIONS } from "./lib/color";
 
 /**
  * Each entry in SHADER_LIB_FUNCTIONS describes one helper function that may
@@ -35,10 +35,17 @@ export const SHADER_LIB_FUNCTIONS = [
  * Names of all lib functions that ShaderStatement may randomly select.
  * Excludes palette/color helpers which are handled separately.
  */
-const _PALETTE_NAMES = new Set(['CosinePalette', 'SmoothHSV']);
-export const SHADER_LIB_NAMES = SHADER_LIB_FUNCTIONS
-  .filter(f => !_PALETTE_NAMES.has(f.name))
-  .map(f => f.name);
+const _PALETTE_NAMES = new Set(["CosinePalette", "SmoothHSV"]);
+export const SHADER_LIB_NAMES = SHADER_LIB_FUNCTIONS.filter(
+  (f) => !_PALETTE_NAMES.has(f.name),
+).map((f) => f.name);
+
+/**
+ * Choices with weights for weighted random selection.
+ */
+export const SHADER_LIB_CHOICES = SHADER_LIB_FUNCTIONS.filter(
+  (f) => !_PALETTE_NAMES.has(f.name),
+).map((f) => ({ value: f.name, weight: f.weight || 0.5 }));
 
 /**
  * Build a Set of function names used by the given array of ShaderStatements
@@ -47,6 +54,15 @@ export function collectUsedLibNames(statements) {
   const used = new Set();
   for (const stmt of statements) {
     if (stmt.functionName) used.add(stmt.functionName);
+
+    // Scan parameter string for nested library function calls
+    if (typeof stmt.parameter === "string" && stmt.parameter.includes("(")) {
+      for (const name of SHADER_LIB_NAMES) {
+        if (stmt.parameter.includes(name + "(")) {
+          used.add(name);
+        }
+      }
+    }
   }
   return used;
 }
@@ -73,7 +89,10 @@ export function buildPreamble(usedNames, usePalette, useTimeInLib) {
   const paletteFnName = usePalette ? "CosinePalette" : "SmoothHSV";
   const paletteFn = SHADER_LIB_FUNCTIONS.find((f) => f.name === paletteFnName);
   if (paletteFn) {
-    const body = useTimeInLib && paletteFn.bodyTimed ? paletteFn.bodyTimed : paletteFn.body;
+    const body =
+      useTimeInLib && paletteFn.bodyTimed
+        ? paletteFn.bodyTimed
+        : paletteFn.body;
     sb.add(body);
   }
 

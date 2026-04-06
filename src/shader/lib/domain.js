@@ -5,6 +5,7 @@ export const DOMAIN_FUNCTIONS = [
     usesTime: true,
     body: `vec4 foldA(vec4 a) { return abs(fract(a)-0.5)*2.; }`,
     bodyTimed: `vec4 foldA(vec4 a) { return abs(fract(a + iTime*0.05)-0.5)*2.; }`,
+    weight: 1.5,
   },
   {
     name: 'mirrorA',
@@ -12,6 +13,7 @@ export const DOMAIN_FUNCTIONS = [
     usesTime: true,
     body: `vec4 mirrorA(vec4 a) { return 1.-abs(fract(a*0.5)*2.-1.); }`,
     bodyTimed: `vec4 mirrorA(vec4 a) { return 1.-abs(fract(a*0.5 + iTime*0.03)*2.-1.); }`,
+    weight: 1.5,
   },
   {
     name: 'sinCosA',
@@ -19,6 +21,7 @@ export const DOMAIN_FUNCTIONS = [
     usesTime: true,
     body: `vec4 sinCosA(vec4 a) { return vec4(sin(a.xy), cos(a.zw)); }`,
     bodyTimed: `vec4 sinCosA(vec4 a) { float t=iTime*0.1; return vec4(sin(a.xy+t), cos(a.zw-t)); }`,
+    weight: 0.8,
   },
   {
     name: 'waveA',
@@ -26,6 +29,7 @@ export const DOMAIN_FUNCTIONS = [
     usesTime: true,
     body: `vec4 waveA(vec4 a) { return sin(a*6.2831853)*0.5+0.5; }`,
     bodyTimed: `vec4 waveA(vec4 a) { return sin(a*6.2831853 + iTime*0.2)*0.5+0.5; }`,
+    weight: 1.4,
   },
   {
     name: 'pulseA',
@@ -33,6 +37,7 @@ export const DOMAIN_FUNCTIONS = [
     usesTime: true,
     body: `vec4 pulseA(vec4 a) { return step(0.5, fract(a)); }`,
     bodyTimed: `vec4 pulseA(vec4 a) { return step(0.5, fract(a + iTime*0.07)); }`,
+    weight: 0.7,
   },
   {
     name: 'sawA',
@@ -40,6 +45,7 @@ export const DOMAIN_FUNCTIONS = [
     usesTime: true,
     body: `vec4 sawA(vec4 a) { return fract(a); }`,
     bodyTimed: `vec4 sawA(vec4 a) { return fract(a + iTime*0.1); }`,
+    weight: 0.9,
   },
   {
     name: 'twistA',
@@ -47,6 +53,7 @@ export const DOMAIN_FUNCTIONS = [
     usesTime: true,
     body: `vec4 twistA(vec4 a) { float s=sin(a.z),c=cos(a.z); return vec4(a.x*c-a.y*s, a.x*s+a.y*c, a.zw); }`,
     bodyTimed: `vec4 twistA(vec4 a) { float k=a.z+iTime*0.05; float s=sin(k),c=cos(k); return vec4(a.x*c-a.y*s, a.x*s+a.y*c, a.zw); }`,
+    weight: 1.2,
   },
   {
     name: 'polarA',
@@ -54,5 +61,6 @@ export const DOMAIN_FUNCTIONS = [
     usesTime: true,
     body: `vec4 polarA(vec4 a) { float r=length(a.xy); float th=atan(a.y,a.x); return vec4(r,th,r,th); }`,
     bodyTimed: `vec4 polarA(vec4 a) { float r=length(a.xy); float th=atan(a.y,a.x)+iTime*0.04; return vec4(r,th,r,th); }`,
+    weight: 1.2,
   },
 ];
