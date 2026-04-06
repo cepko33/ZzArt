@@ -1,6 +1,7 @@
 import { state } from '../../state';
 import { ControlRow } from '../ControlRow';
 import { SetGridSize } from '../../ui/ui';
+import { SaveLocalStorage } from '../../storage';
 
 export const GeneralSettings = {
     render() {
@@ -13,6 +14,18 @@ export const GeneralSettings = {
                 </div>
                 <ControlRow label="Save Scale">
                     <input type="number" v-model={state.settings.saveScale} class="advanced" />
+                </ControlRow>
+                <ControlRow label="Sim Speed">
+                    <input 
+                        type="range" 
+                        min="0.01" 
+                        max="2.0" 
+                        step="0.01" 
+                        v-model={state.settings.simulationSpeed} 
+                        onInput={() => SaveLocalStorage()}
+                        class="advanced-slider"
+                    />
+                    <span class="slider-value">{Number(state.settings.simulationSpeed || 1).toFixed(2)}x</span>
                 </ControlRow>
                 <ControlRow label="Grid Size">
                     <input 

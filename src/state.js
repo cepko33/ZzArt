@@ -32,6 +32,8 @@ export const state = reactive({
     uniqueID: 0,
     isInit: false,
     time: 0,
+    accumulatedTime: 0,
+    lastFrameTime: 0,
     vertexShader: 0,
     lastSatelliteUpdate: 0,
     
@@ -68,6 +70,7 @@ export const state = reactive({
         showWatermark: false,
         saveScale: 2,
         randomizeLength: 15,
+        simulationSpeed: 1.0,
     },
 
     // UI helper for raw code viewing

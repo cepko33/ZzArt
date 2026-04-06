@@ -161,7 +161,15 @@ export function RenderShader(code, feedbackOpts)
     let mainProg = _getOrCreateProgram(x, mainSrc);
     if (!mainProg) return;
 
-    state.time = performance.now() / 1000;
+    const now = performance.now() / 1000;
+    if (!state.lastFrameTime) state.lastFrameTime = now;
+    const dt = now - state.lastFrameTime;
+
+    if (dt > 0) {
+        state.accumulatedTime += dt * (state.settings.simulationSpeed ?? 1.0);
+        state.lastFrameTime = now;
+    }
+    state.time = state.accumulatedTime;
 
     const feedback = feedbackOpts && feedbackOpts.useFeedback;
 

@@ -16,6 +16,7 @@ export function SaveLocalStorage()
         advancedMode: state.advancedMode,
         gridSize: state.gridSize,
         favorite: state.favoriteShader,
+        simulationSpeed: state.settings.simulationSpeed,
         lastUpdate: Date.now()
     }
         
@@ -50,7 +51,8 @@ export function SaveSettingsToCookie()
         saveScale: state.settings.saveScale,
         gridSize: state.gridSize,
         startIterations: state.startIterations,
-        advancedMode: state.advancedMode
+        advancedMode: state.advancedMode,
+        simulationSpeed: state.settings.simulationSpeed
     };
 
     setCookie('zzart_settings', JSON.stringify(settings), 365);
@@ -76,6 +78,9 @@ export function LoadSettingsFromCookie()
         }
         if (settings.advancedMode !== undefined) {
             state.advancedMode = settings.advancedMode;
+        }
+        if (settings.simulationSpeed !== undefined) {
+            state.settings.simulationSpeed = parseFloat(settings.simulationSpeed);
         }
     } catch (e) {
         console.error("Failed to parse settings cookie", e);
