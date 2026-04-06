@@ -79,7 +79,21 @@ export function SetGridSize(newGridSize)
 export function UpdateUI()
 {
     if (state.satelliteMode)
+    {
+        if (state.canvas_main) {
+            state.canvas_main.width = window.innerWidth;
+            state.canvas_main.height = window.innerHeight;
+            state.canvas_main.style.width = '100vw';
+            state.canvas_main.style.height = '100vh';
+        }
+        if (state.canvas_shader) {
+            state.canvas_shader.width = window.innerWidth;
+            state.canvas_shader.height = window.innerHeight;
+            state.canvas_shader.style.width = '100vw';
+            state.canvas_shader.style.height = '100vh';
+        }
         return;
+    }
 
     if (!state.isInit)
     {
@@ -638,11 +652,22 @@ export function UpdateSatelliteMode()
         let saveData = JSON.parse(localStorageItem);
         if (saveData.lastUpdate != state.lastSatelliteUpdate)
         {
-            state.lastSatelliteUpdate = saveData.lastUpdate;
             let rawObject = saveData.favorite;
-            
-            if (state.feedbackClearOnChange || rawObject.uniqueID != state.favoriteShader?.uniqueID)
+            if (!rawObject) return;
+
+            const oldShader = state.favoriteShader;
+            const newShaderRaw = rawObject;
+
+            // Only clear feedback if the shader identity changed OR if feedback was toggled from OFF to ON.
+            // We ignore state.feedbackClearOnChange here because it would trigger on every slider movement,
+            // which breaks the intended accumulation effect in the satellite window.
+            const identityChanged = oldShader?.uniqueID !== newShaderRaw.uniqueID;
+            const feedbackToggledOn = !oldShader?.useFeedback && newShaderRaw.useFeedback;
+
+            if (identityChanged || feedbackToggledOn)
                 ClearFeedback();
+
+            state.lastSatelliteUpdate = saveData.lastUpdate;
             state.favoriteShader = Object.assign(new ShaderObject(), rawObject).Clone();
         }
     }
@@ -650,6 +675,8 @@ export function UpdateSatelliteMode()
 
 export function InitSatelliteMode()
 {
+    if (!state.favoriteShader)
+        state.favoriteShader = new ShaderObject();
     state.favoriteShader.randSeed = 0;
     
     function Animate() {
@@ -658,8 +685,15 @@ export function InitSatelliteMode()
             requestAnimationFrame(Animate);
         }
     }
-    requestAnimationFrame(Animate);
     
+    window.addEventListener('resize', UpdateUI);
+    window.addEventListener('storage', (e) => {
+        if (e.key === 'saveData') UpdateSatelliteMode();
+    });
+    UpdateUI();
+    
+    UpdateSatelliteMode();
+    requestAnimationFrame(Animate);
     setInterval(UpdateSatelliteMode, 100);
 }
 

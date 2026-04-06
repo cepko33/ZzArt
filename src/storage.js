@@ -9,14 +9,13 @@ export function SaveLocalStorage()
     if (state.satelliteMode)
         return;
         
-    let shader = state.shaderMemory[state.shaderMemoryLocation];
     let saveData = 
     {
         version: state.config.dataVersion,
         showWatermark: state.settings.showWatermark,
         advancedMode: state.advancedMode,
         gridSize: state.gridSize,
-        favorite: shader,
+        favorite: state.favoriteShader,
         lastUpdate: Date.now()
     }
         

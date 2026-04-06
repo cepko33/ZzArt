@@ -42,58 +42,57 @@ export default {
     const { state } = this;
 
     return (
-      <div class="app-container">
+      <div class={["app-container", state.satelliteMode ? "satellite-mode" : ""]}>
         {/* Satellite Mode View */}
         {state.satelliteMode && <SatelliteControls />}
 
-        {/* Main UI */}
-        {!state.satelliteMode && (
-          <div style={{ textAlign: "center" }}>
-            <div id="div_title">
-              <span>{state.favoriteShader?.GetGenerationString() || 0}</span>
-            </div>
+        <div style={{ textAlign: "center" }}>
+          {!state.satelliteMode && (
+            <>
+              <div id="div_title">
+                <span>{state.favoriteShader?.GetGenerationString() || 0}</span>
+              </div>
+              <Toolbar />
+            </>
+          )}
 
-            <Toolbar />
+          <canvas
+            ref="canvasMain"
+            id="canvas_main"
+            width="1920px"
+            height="1080px"
+            style={{
+              width: state.satelliteMode ? "100vw" : "1280px",
+              height: state.satelliteMode ? "100vh" : "720px",
+              border: state.satelliteMode ? "none" : "2px solid black",
+              display: (state.showPreview || state.satelliteMode) ? "none" : "block",
+            }}
+          ></canvas>
 
-            <canvas
-              ref="canvasMain"
-              id="canvas_main"
-              width="1920px"
-              height="1080px"
-              style={{
-                width: "1280px",
-                height: "720px",
-                border: "2px solid black",
-                display: state.showPreview ? "none" : "block",
-              }}
-            ></canvas>
+          <canvas
+            ref="canvasShader"
+            id="canvas_shader"
+            style={{
+              width: state.satelliteMode ? "100vw" : "1280px",
+              height: state.satelliteMode ? "100vh" : "720px",
+              border: state.satelliteMode ? "none" : "2px solid black",
+              display: (state.showPreview || state.satelliteMode) ? "block" : "none",
+            }}
+          ></canvas>
 
-            <canvas
-              ref="canvasShader"
-              id="canvas_shader"
-              style={{
-                width: "1280px",
-                height: "720px",
-                border: "2px solid black",
-                display: state.showPreview ? "block" : "none",
-              }}
-            ></canvas>
+          <canvas
+            ref="canvasSave"
+            id="canvas_save"
+            hidden
+            style={{
+              width: "1280px",
+              height: "720px",
+              border: "2px solid black",
+            }}
+          ></canvas>
 
-            <canvas
-              ref="canvasSave"
-              id="canvas_save"
-              hidden
-              style={{
-                width: "1280px",
-                height: "720px",
-                border: "2px solid black",
-              }}
-            ></canvas>
-
-            <br />
-            {state.advancedMode && <AdvancedPanel />}
-          </div>
-        )}
+          {!state.satelliteMode && state.advancedMode && <AdvancedPanel />}
+        </div>
       </div>
     );
   },

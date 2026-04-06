@@ -12,6 +12,39 @@ div.satellite
     -webkit-text-stroke-width: 1px; 
     -webkit-text-stroke-color: black; 
 }
+
+/* Satellite Mode Layout */
+.satellite-mode {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    width: 100vw;
+    height: 100vh;
+    background: #000;
+}
+
+.satellite-mode div.satellite {
+    display: block;
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    z-index: 1000;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 5px;
+    border-radius: 12px;
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+.satellite-mode canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw !important;
+    height: 100vh !important;
+    object-fit: contain;
+    border: none !important;
+}
 select
 {
     background-color: #000; 
