@@ -12,11 +12,27 @@ export const FeedbackSettings = {
             <details class="advanced-group">
                 <summary>🌀 Feedback</summary>
                 <div class="control-row">
-                    <label><input type="checkbox" v-model={fsActive.useFeedback} onChange={UpdateFeedbackUI} /> <b>Enable</b></label>
-                    <label><input type="checkbox" v-model={state.feedback.locked} /> Lock</label>
-                    <label><input type="checkbox" v-model={fsActive.feedbackSwap} onChange={UpdateFeedbackUI} /> Swap</label>
+                    <label>
+                        <input
+                            type="checkbox"
+                            v-model={fsActive.useFeedback}
+                            onChange={UpdateFeedbackUI}
+                        />{' '}
+                        <b>Enable</b>
+                    </label>
+                    <label>
+                        <input type="checkbox" v-model={state.feedback.locked} /> Lock
+                    </label>
+                    <label>
+                        <input
+                            type="checkbox"
+                            v-model={fsActive.feedbackSwap}
+                            onChange={UpdateFeedbackUI}
+                        />{' '}
+                        Swap
+                    </label>
                 </div>
-                
+
                 <ControlRow label="Blend">
                     <select v-model={fsActive.feedbackBlendMode} onChange={UpdateFeedbackUI}>
                         <option value={0}>0 - Mix</option>
@@ -31,8 +47,18 @@ export const FeedbackSettings = {
                     </select>
                 </ControlRow>
 
-                <ControlRow label="Mix" sliderValue={Number(fsActive.feedbackAmount ?? 0).toFixed(2)}>
-                    <input type="range" min="0.5" max="0.99" step="0.01" v-model={fsActive.feedbackAmount} onInput={UpdateFeedbackUI} />
+                <ControlRow
+                    label="Mix"
+                    sliderValue={Number(fsActive.feedbackAmount ?? 0).toFixed(2)}
+                >
+                    <input
+                        type="range"
+                        min="0.5"
+                        max="0.99"
+                        step="0.01"
+                        v-model={fsActive.feedbackAmount}
+                        onInput={UpdateFeedbackUI}
+                    />
                 </ControlRow>
 
                 <ControlRow label="Mask">
@@ -56,28 +82,103 @@ export const FeedbackSettings = {
                                 <option value={2}>Sat</option>
                                 <option value={3}>Val</option>
                             </select>
-                            <input type="color" 
-                                value={this.chromaKeyHex} 
-                                onInput={(e) => this.$emit('update:chromaKeyHex', e.target.value)} 
+                            <input
+                                type="color"
+                                value={this.chromaKeyHex}
+                                onInput={(e) => this.$emit('update:chromaKeyHex', e.target.value)}
                             />
                         </ControlRow>
-                        <ControlRow label="Thr" sliderValue={Number(fsActive.chromaThreshold ?? 0).toFixed(2)}>
-                            <input type="range" min="0" max="1" step="0.01" v-model={fsActive.chromaThreshold} onInput={UpdateFeedbackUI} />
+                        <ControlRow
+                            label="Thr"
+                            sliderValue={Number(fsActive.chromaThreshold ?? 0).toFixed(2)}
+                        >
+                            <input
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.01"
+                                v-model={fsActive.chromaThreshold}
+                                onInput={UpdateFeedbackUI}
+                            />
                         </ControlRow>
-                        <ControlRow label="Soft" sliderValue={Number(fsActive.chromaSoftness ?? 0).toFixed(2)}>
-                            <input type="range" min="0" max="1" step="0.01" v-model={fsActive.chromaSoftness} onInput={UpdateFeedbackUI} />
+                        <ControlRow
+                            label="Soft"
+                            sliderValue={Number(fsActive.chromaSoftness ?? 0).toFixed(2)}
+                        >
+                            <input
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.01"
+                                v-model={fsActive.chromaSoftness}
+                                onInput={UpdateFeedbackUI}
+                            />
                         </ControlRow>
                     </div>
                 )}
-
-                <ControlRow label="Sharp" sliderValue={Number(fsActive.feedbackSharpen ?? 0).toFixed(2)}>
-                    <input type="range" min="0" max="1" step="0.01" v-model={fsActive.feedbackSharpen} onInput={UpdateFeedbackUI} />
+                <ControlRow label="Mod">
+                    <select v-model={fsActive.feedbackModType} onChange={UpdateFeedbackUI}>
+                        <option value={0}>0 - None</option>
+                        <option value={1}>1 - Distort</option>
+                        <option value={2}>2 - Displace</option>
+                        <option value={3}>3 - Scale</option>
+                        <option value={4}>4 - Rotate</option>
+                    </select>
                 </ControlRow>
 
-                <ControlRow label="Blur" sliderValue={Number(fsActive.feedbackBlur ?? 0).toFixed(2)}>
-                    <input type="range" min="0" max="1" step="0.01" v-model={fsActive.feedbackBlur} onInput={UpdateFeedbackUI} />
+                <ControlRow
+                    label="Mod Amt"
+                    sliderValue={Number(fsActive.feedbackModAmount ?? 0).toFixed(2)}
+                >
+                    <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.01"
+                        v-model={fsActive.feedbackModAmount}
+                        onInput={UpdateFeedbackUI}
+                    />
+                </ControlRow>
+
+                <ControlRow label="Order">
+                    <select v-model={fsActive.feedbackOpOrder} onChange={UpdateFeedbackUI}>
+                        <option value={0}>0 - Standard</option>
+                        <option value={1}>1 - Mask-gate</option>
+                        <option value={2}>2 - Inv-gate</option>
+                        <option value={3}>3 - Warp-then-mask</option>
+                        <option value={4}>4 - Mask-steers-UV</option>
+                        <option value={5}>5 - Mod-vs-amount</option>
+                    </select>
+                </ControlRow>
+
+                <ControlRow
+                    label="Sharp"
+                    sliderValue={Number(fsActive.feedbackSharpen ?? 0).toFixed(2)}
+                >
+                    <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.01"
+                        v-model={fsActive.feedbackSharpen}
+                        onInput={UpdateFeedbackUI}
+                    />
+                </ControlRow>
+
+                <ControlRow
+                    label="Blur"
+                    sliderValue={Number(fsActive.feedbackBlur ?? 0).toFixed(2)}
+                >
+                    <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.01"
+                        v-model={fsActive.feedbackBlur}
+                        onInput={UpdateFeedbackUI}
+                    />
                 </ControlRow>
             </details>
         );
-    }
+    },
 };

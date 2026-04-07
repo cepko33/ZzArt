@@ -6,7 +6,9 @@
  * with the previous frame's history, often with UV distortion.
  */
 
-function _clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+function _clamp(v, lo, hi) {
+    return v < lo ? lo : v > hi ? hi : v;
+}
 
 /**
  * Build the hardcoded composite fragment shader for the feedback pass.
@@ -21,60 +23,71 @@ function _clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
  * @param {number} height     canvas height
  * @returns {string}  Complete GLSL source for the composite fragment shader
  */
-export function buildCompositeShader(blendMode, maskType, modType, opOrder, sharpen, blur, width, height) {
-  const sNum = Number(sharpen) || 0;
-  const bNum = Number(blur)    || 0;
+export function buildCompositeShader(
+    blendMode,
+    maskType,
+    modType,
+    opOrder,
+    sharpen,
+    blur,
+    width,
+    height
+) {
+    const sNum = Number(sharpen) || 0;
+    const bNum = Number(blur) || 0;
 
-  // ── Blend sub-expression (uses curr, prev, alpha already declared) ────────
-  const blendExprs = [
-    /* 0 Mix        */ `mix(curr, prev, alpha)`,
-    /* 1 Additive   */ `clamp(prev * alpha + curr, 0., 1.)`,
-    /* 2 Multiply   */ `clamp(prev * curr + curr * (1. - alpha), 0., 1.)`,
-    /* 3 Screen     */ `1. - (1. - prev) * (1. - curr) * alpha`,
-    /* 4 Difference */ `abs(prev - curr) * alpha + curr * (1. - alpha)`,
-    /* 5 Lighten    */ `max(prev, curr) * alpha + curr * (1. - alpha)`,
-    /* 6 Darken     */ `min(prev, curr) * alpha + curr * (1. - alpha)`,
-    /* 7 Burn       */ `1. - (1. - prev * alpha) / (curr + 0.001)`,
-    /* 8 Atop       */ `curr + prev * (1.0 - dot(curr.rgb, vec3(0.299,0.587,0.114))) * alpha`,
-  ];
-  const blendExpr = blendExprs[_clamp(blendMode, 0, blendExprs.length - 1)];
+    // ── Blend sub-expression (uses curr, prev, alpha already declared) ────────
+    const blendExprs = [
+        /* 0 Mix        */ `mix(curr, prev, alpha)`,
+        /* 1 Additive   */ `clamp(prev * alpha + curr, 0., 1.)`,
+        /* 2 Multiply   */ `clamp(prev * curr + curr * (1. - alpha), 0., 1.)`,
+        /* 3 Screen     */ `1. - (1. - prev) * (1. - curr) * alpha`,
+        /* 4 Difference */ `abs(prev - curr) * alpha + curr * (1. - alpha)`,
+        /* 5 Lighten    */ `max(prev, curr) * alpha + curr * (1. - alpha)`,
+        /* 6 Darken     */ `min(prev, curr) * alpha + curr * (1. - alpha)`,
+        /* 7 Burn       */ `1. - (1. - prev * alpha) / (curr + 0.001)`,
+        /* 8 Atop       */ `curr + prev * (1.0 - dot(curr.rgb, vec3(0.299,0.587,0.114))) * alpha`,
+    ];
+    const blendExpr = blendExprs[_clamp(blendMode, 0, blendExprs.length - 1)];
 
-  // ── Mask sub-expression ────────────────────────────────────────────────────
-  const maskExprs = [
-    /* 0 None      */ `1.0`,
-    /* 1 Luminance */ `dot(curr.rgb, vec3(0.299, 0.587, 0.114))`,
-    /* 2 Red ch.   */ `curr.r`,
-    /* 3 Edge      */ `clamp((abs(texture2D(iCurrent,uv+vec2(dx,0.)).r-texture2D(iCurrent,uv-vec2(dx,0.)).r)+abs(texture2D(iCurrent,uv+vec2(0.,dy)).r-texture2D(iCurrent,uv-vec2(0.,dy)).r))*8.0,0.,1.)`,
-    /* 4 Hue dist  */ `clamp(distance(curr.rgb, prev.rgb) * 3.0, 0., 1.)`,
-    /* 5 Alpha     */ `curr.a`,
-    /* 6 Chroma    */ `calcChroma(curr.rgb, iChromaKeyColor, iChromaThreshold, iChromaSoftness, iChromaMode)`,
-  ];
-  const maskExpr = maskExprs[_clamp(maskType, 0, maskExprs.length - 1)];
+    // ── Mask sub-expression ────────────────────────────────────────────────────
+    const maskExprs = [
+        /* 0 None      */ `1.0`,
+        /* 1 Luminance */ `dot(curr.rgb, vec3(0.299, 0.587, 0.114))`,
+        /* 2 Red ch.   */ `curr.r`,
+        /* 3 Edge      */ `clamp((abs(texture2D(iCurrent,uv+vec2(dx,0.)).r-texture2D(iCurrent,uv-vec2(dx,0.)).r)+abs(texture2D(iCurrent,uv+vec2(0.,dy)).r-texture2D(iCurrent,uv-vec2(0.,dy)).r))*8.0,0.,1.)`,
+        /* 4 Hue dist  */ `clamp(distance(curr.rgb, prev.rgb) * 3.0, 0., 1.)`,
+        /* 5 Alpha     */ `curr.a`,
+        /* 6 Chroma    */ `calcChroma(curr.rgb, iChromaKeyColor, iChromaThreshold, iChromaSoftness, iChromaMode)`,
+    ];
+    const maskExpr = maskExprs[_clamp(maskType, 0, maskExprs.length - 1)];
 
-  // ── UV modulation kernel (outputs `uvp`, reads `mod_a`, `uv`, `iTime`) ────
-  const modKernels = [
-    /* 0 None     */ (m) => `vec2 uvp = uv;`,
-    /* 1 Distort  */ (m) => `vec2 uvp = uv + sin(uv.yx*6.2831853+iTime*0.5)*${m}*0.04;`,
-    /* 2 Displace */ (m) => `vec2 _h=fract(sin(vec2(dot(uv,vec2(127.1,311.7)),dot(uv,vec2(269.5,183.3))))*43758.547);\n  vec2 uvp=uv+(_h-0.5)*${m}*0.06;`,
-    /* 3 Scale    */ (m) => `vec2 uvp=(uv-0.5)*(1.0-${m}*0.03)+0.5;`,
-    /* 4 Rotate   */ (m) => `float _ang=${m}*0.06;float _s=sin(_ang),_c=cos(_ang);vec2 _off=uv-0.5;\n  vec2 uvp=vec2(_c*_off.x-_s*_off.y,_s*_off.x+_c*_off.y)+0.5;`,
-  ];
-  const mk = modKernels[_clamp(modType, 0, modKernels.length - 1)];
+    // ── UV modulation kernel (outputs `uvp`, reads `mod_a`, `uv`, `iTime`) ────
+    const modKernels = [
+        /* 0 None     */ (m) => `vec2 uvp = uv;`,
+        /* 1 Distort  */ (m) => `vec2 uvp = uv + sin(uv.yx*6.2831853+iTime*0.5)*${m}*0.04;`,
+        /* 2 Displace */ (m) =>
+            `vec2 _h=fract(sin(vec2(dot(uv,vec2(127.1,311.7)),dot(uv,vec2(269.5,183.3))))*43758.547);\n  vec2 uvp=uv+(_h-0.5)*${m}*0.06;`,
+        /* 3 Scale    */ (m) => `vec2 uvp=(uv-0.5)*(1.0-${m}*0.03)+0.5;`,
+        /* 4 Rotate   */ (m) =>
+            `float _ang=${m}*0.06;float _s=sin(_ang),_c=cos(_ang);vec2 _off=uv-0.5;\n  vec2 uvp=vec2(_c*_off.x-_s*_off.y,_s*_off.x+_c*_off.y)+0.5;`,
+    ];
+    const mk = modKernels[_clamp(modType, 0, modKernels.length - 1)];
 
-  // ── Operation-order bodies ─────────────────────────────────────────────────
-  const opBodies = [
-    /* 0 Standard: mod UV → sample → mask(curr) → blend */
-    `  ${mk('mod_a')}
+    // ── Operation-order bodies ─────────────────────────────────────────────────
+    const opBodies = [
+        /* 0 Standard: mod UV → sample → mask(curr) → blend */
+        `  ${mk('mod_a')}
   vec4 curr = texture2D(iCurrent, uv);
   vec4 prev = texture2D(iPrevious, clamp(uvp,0.,1.));
   float mask = ${maskExpr};
   float alpha = iFeedbackAmount * mask;
   gl_FragColor = ${blendExpr};`,
 
-    /* 1 Mask-gate: mask(curr) first → gates mod_a → mod UV → sample → blend */
-    `  vec4 curr = texture2D(iCurrent, uv);
+        /* 1 Mask-gate: mask(curr) first → gates mod_a → mod UV → sample → blend */
+        `  vec4 curr = texture2D(iCurrent, uv);
   vec4 prev0 = texture2D(iPrevious, uv);
-  float mask0 = ${maskExpr.replace(/\bprev\b/g,'prev0')};
+  float mask0 = ${maskExpr.replace(/\bprev\b/g, 'prev0')};
   float gated_a = mod_a * mask0;
   ${mk('gated_a')}
   vec4 prev = texture2D(iPrevious, clamp(uvp,0.,1.));
@@ -82,10 +95,10 @@ export function buildCompositeShader(blendMode, maskType, modType, opOrder, shar
   float alpha = iFeedbackAmount * mask;
   gl_FragColor = ${blendExpr};`,
 
-    /* 2 Inv-gate: (1-mask) gates mod_a → stronger warping in dark/low areas */
-    `  vec4 curr = texture2D(iCurrent, uv);
+        /* 2 Inv-gate: (1-mask) gates mod_a → stronger warping in dark/low areas */
+        `  vec4 curr = texture2D(iCurrent, uv);
   vec4 prev0 = texture2D(iPrevious, uv);
-  float mask0 = ${maskExpr.replace(/\bprev\b/g,'prev0')};
+  float mask0 = ${maskExpr.replace(/\bprev\b/g, 'prev0')};
   float inv_a = mod_a * (1.0 - mask0);
   ${mk('inv_a')}
   vec4 prev = texture2D(iPrevious, clamp(uvp,0.,1.));
@@ -93,30 +106,32 @@ export function buildCompositeShader(blendMode, maskType, modType, opOrder, shar
   float alpha = iFeedbackAmount * mask;
   gl_FragColor = ${blendExpr};`,
 
-    /* 3 Warp-then-mask: mod UV → sample warped prev → mask compares curr vs warped prev */
-    `  ${mk('mod_a')}
+        /* 3 Warp-then-mask: mod UV → sample warped prev → mask compares curr vs warped prev */
+        `  ${mk('mod_a')}
   vec4 curr = texture2D(iCurrent, uv);
   vec4 prev = texture2D(iPrevious, clamp(uvp,0.,1.));
   float mask = ${maskExpr};
   float alpha = iFeedbackAmount * mask;
   gl_FragColor = ${blendExpr};`,
 
-    /* 4 Mask-steers-UV: mask from curr biases the UV warp direction toward bright pixels */
-    `  vec4 curr = texture2D(iCurrent, uv);
+        /* 4 Mask-steers-UV: mask from curr biases the UV warp direction toward bright pixels */
+        `  vec4 curr = texture2D(iCurrent, uv);
   float lx = dot(texture2D(iCurrent,uv+vec2(dx,0.)).rgb,vec3(.299,.587,.114));
   float rx = dot(texture2D(iCurrent,uv-vec2(dx,0.)).rgb,vec3(.299,.587,.114));
   float ly = dot(texture2D(iCurrent,uv+vec2(0.,dy)).rgb,vec3(.299,.587,.114));
   float ry = dot(texture2D(iCurrent,uv-vec2(0.,dy)).rgb,vec3(.299,.587,.114));
   vec2 grad = vec2(lx-rx, ly-ry) * mod_a * 0.05;
   vec2 uvg = uv + grad;
-  ${mk('mod_a').replace(/\buv\b/g,'uvg').replace('uvg.yx','uv.yx')}
+  ${mk('mod_a')
+      .replace(/\buv\b/g, 'uvg')
+      .replace('uvg.yx', 'uv.yx')}
   vec4 prev = texture2D(iPrevious, clamp(uvp,0.,1.));
   float mask = ${maskExpr};
   float alpha = iFeedbackAmount * mask;
   gl_FragColor = ${blendExpr};`,
 
-    /* 5 Mod-vs-amount: mod_a and iFeedbackAmount trade off */
-    `  float traded_blend = iFeedbackAmount * (1.0 - mod_a * 0.5);
+        /* 5 Mod-vs-amount: mod_a and iFeedbackAmount trade off */
+        `  float traded_blend = iFeedbackAmount * (1.0 - mod_a * 0.5);
   float traded_mod   = mod_a * (1.0 + iFeedbackAmount * 0.5);
   ${mk('traded_mod')}
   vec4 curr = texture2D(iCurrent, uv);
@@ -124,11 +139,11 @@ export function buildCompositeShader(blendMode, maskType, modType, opOrder, shar
   float mask = ${maskExpr};
   float alpha = traded_blend * mask;
   gl_FragColor = ${blendExpr};`,
-  ];
+    ];
 
-  const body = opBodies[_clamp(opOrder, 0, opBodies.length - 1)];
+    const body = opBodies[_clamp(opOrder, 0, opBodies.length - 1)];
 
-  return `precision mediump float;
+    return `precision mediump float;
 uniform sampler2D iCurrent;
 uniform sampler2D iPrevious;
 uniform float iFeedbackAmount;

@@ -1,16 +1,28 @@
-body,select { font-size: 20px; font-family: monospace; color: #FFF; }
-input     { font-size: 20px; }
-a         { color:#5AF; }
-a:visited { color:#A5A; }
-canvas    { background-color: #FFF; }
-div.satellite
-{
-    display:none;
-    z-index:100;
-    position:relative;
-    -webkit-text-fill-color: white; 
-    -webkit-text-stroke-width: 1px; 
-    -webkit-text-stroke-color: black; 
+body,
+select {
+    font-size: 20px;
+    font-family: monospace;
+    color: #fff;
+}
+input {
+    font-size: 20px;
+}
+a {
+    color: #5af;
+}
+a:visited {
+    color: #a5a;
+}
+canvas {
+    background-color: #fff;
+}
+div.satellite {
+    display: none;
+    z-index: 100;
+    position: relative;
+    -webkit-text-fill-color: white;
+    -webkit-text-stroke-width: 1px;
+    -webkit-text-stroke-color: black;
 }
 
 /* Satellite Mode Layout */
@@ -33,7 +45,7 @@ div.satellite
     padding: 5px;
     border-radius: 12px;
     backdrop-filter: blur(4px);
-    border: 1px solid rgba(255,255,255,0.1);
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .satellite-mode canvas {
@@ -45,42 +57,37 @@ div.satellite
     object-fit: contain;
     border: none !important;
 }
-select
-{
-    background-color: #000; 
+select {
+    background-color: #000;
 }
-button
-{ 
-    font-size: 30px; 
-    vertical-align: middle; 
-    text-align: center; 
-    background-color: #EEE; 
-    margin: 10px; 
+button {
+    font-size: 30px;
+    vertical-align: middle;
+    text-align: center;
+    background-color: #eee;
+    margin: 10px;
 }
-button.small
-{ 
+button.small {
     border-radius: 10px;
-    height:45px;
+    height: 45px;
 }
-button.satellite
-{
-    background-color: #FFF; 
-    -webkit-text-fill-color: black; 
-    -webkit-text-stroke-width: 1px; 
+button.satellite {
+    background-color: #fff;
+    -webkit-text-fill-color: black;
+    -webkit-text-stroke-width: 1px;
     color: #000;
     font-size: 30px;
     margin-top: 0px;
     margin-right: 0px;
     margin-left: 0px;
     padding: 2px;
-    width:45px;
-    height:45px;
+    width: 45px;
+    height: 45px;
     border-radius: 10px;
 }
-input.advanced
-{
-    width:80px;
-    height:20px;
+input.advanced {
+    width: 80px;
+    height: 20px;
 }
 
 /* Advanced Options Modern Layout */
@@ -91,7 +98,7 @@ input.advanced
     gap: 25px;
     padding: 30px;
     background: #1a1a1a;
-    border-bottom: 2px solid #5AF;
+    border-bottom: 2px solid #5af;
     text-align: left;
     max-width: 1600px;
     margin: 0 auto;
@@ -119,7 +126,7 @@ input.advanced
     background: #262626;
     border-radius: 8px;
     border: 1px solid #333;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
     overflow: hidden;
     margin-bottom: 5px;
 }
@@ -129,7 +136,7 @@ input.advanced
     cursor: pointer;
     padding: 12px 15px;
     font-size: 18px;
-    color: #5AF;
+    color: #5af;
     font-weight: bold;
     letter-spacing: 1px;
     background: #2a2a2a;
@@ -148,7 +155,7 @@ input.advanced
 .advanced-group summary::after {
     content: '▼';
     font-size: 11px;
-    color: #5AF;
+    color: #5af;
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     opacity: 0.7;
 }
@@ -168,7 +175,7 @@ input.advanced
 }
 
 /* Padding for content inside details */
-.advanced-group > div:not(.pipeline-container), 
+.advanced-group > div:not(.pipeline-container),
 .advanced-group > textarea,
 .advanced-group > .control-row {
     margin: 15px;
@@ -194,7 +201,7 @@ input.advanced
 }
 
 .control-row span {
-    color: #AAA;
+    color: #aaa;
     font-weight: bold;
 }
 
@@ -209,15 +216,15 @@ input.advanced
     justify-content: space-between;
 }
 
-.slider-row input[type=range] {
+.slider-row input[type='range'] {
     width: 100%;
 }
 
-.advanced-column select, 
-.advanced-column input[type=number],
-.advanced-column input[type=color] {
+.advanced-column select,
+.advanced-column input[type='number'],
+.advanced-column input[type='color'] {
     background: #000;
-    color: #FFF;
+    color: #fff;
     border: 1px solid #444;
     padding: 4px 8px;
     border-radius: 4px;
@@ -227,7 +234,7 @@ input.advanced
 .advanced-column textarea {
     width: 100%;
     background: #000;
-    color: #0F0;
+    color: #0f0;
     border: 1px solid #333;
     border-radius: 4px;
     padding: 10px;
@@ -251,15 +258,15 @@ input.advanced
     margin: 0;
     cursor: pointer;
     border-radius: 6px;
-    border: 1px solid rgba(255,255,255,0.1);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     background: #333;
-    color: #EEE;
+    color: #eee;
     transition: all 0.2s;
 }
 
 .action-button:hover {
     background: #444;
-    border-color: #5AF;
+    border-color: #5af;
     transform: translateY(-1px);
 }
 
@@ -277,7 +284,7 @@ input.advanced
     padding: 12px;
     background: #333;
     border-radius: 6px;
-    border-left: 3px solid #5AF;
+    border-left: 3px solid #5af;
 }
 
 #select_saveList {
@@ -298,9 +305,9 @@ input.advanced
     gap: 0;
     margin-top: 15px;
     padding: 10px;
-    background: rgba(0,0,0,0.2);
+    background: rgba(0, 0, 0, 0.2);
     border-radius: 12px;
-    border: 1px solid rgba(255,255,255,0.05);
+    border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .pipeline-flow {
@@ -333,16 +340,22 @@ input.advanced
     transform: translateY(-2px) scale(1.01);
 }
 
-.generator-node { border-top: 3px solid #5AF; }
-.compositor-node { border-top: 3px solid #F85; }
-.output-node { border-top: 3px solid #A5F; }
+.generator-node {
+    border-top: 3px solid #5af;
+}
+.compositor-node {
+    border-top: 3px solid #f85;
+}
+.output-node {
+    border-top: 3px solid #a5f;
+}
 
 .node-header {
     font-size: 12px;
     font-weight: 900;
     letter-spacing: 1.5px;
     color: #fff;
-    text-shadow: 0 0 10px rgba(255,255,255,0.3);
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
     text-transform: uppercase;
     display: flex;
     align-items: center;
@@ -358,15 +371,15 @@ input.advanced
 }
 
 .node-param-tag {
-    background: rgba(0,0,0,0.4);
-    color: #AAA;
+    background: rgba(0, 0, 0, 0.4);
+    color: #aaa;
     padding: 2px 6px;
     border-radius: 10px;
-    border: 1px solid rgba(255,255,255,0.05);
+    border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .node-param-tag.active {
-    color: #5AF;
+    color: #5af;
     border-color: rgba(90, 175, 255, 0.3);
 }
 
@@ -388,14 +401,21 @@ input.advanced
     scrollbar-color: #333 #080808;
 }
 
-.code-viewer::-webkit-scrollbar { width: 6px; }
-.code-viewer::-webkit-scrollbar-track { background: #080808; }
-.code-viewer::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+.code-viewer::-webkit-scrollbar {
+    width: 6px;
+}
+.code-viewer::-webkit-scrollbar-track {
+    background: #080808;
+}
+.code-viewer::-webkit-scrollbar-thumb {
+    background: #333;
+    border-radius: 3px;
+}
 
 .pipeline-connection {
     height: 30px;
     width: 2px;
-    background: linear-gradient(to bottom, #5AF, #F85);
+    background: linear-gradient(to bottom, #5af, #f85);
     position: relative;
     opacity: 0.6;
 }
@@ -407,17 +427,27 @@ input.advanced
     left: -2px;
     width: 6px;
     height: 6px;
-    background: #FFF;
+    background: #fff;
     border-radius: 50%;
-    box-shadow: 0 0 10px #FFF;
+    box-shadow: 0 0 10px #fff;
     animation: flowDown 1.5s infinite linear;
 }
 
 @keyframes flowDown {
-    0% { transform: translateY(0); opacity: 0; }
-    20% { opacity: 1; }
-    80% { opacity: 1; }
-    100% { transform: translateY(30px); opacity: 0; }
+    0% {
+        transform: translateY(0);
+        opacity: 0;
+    }
+    20% {
+        opacity: 1;
+    }
+    80% {
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(30px);
+        opacity: 0;
+    }
 }
 
 .buffer-nodes {
@@ -439,9 +469,17 @@ input.advanced
     gap: 2px;
 }
 
-.buffer-tag b { color: #888; }
-.buffer-tag.active { border-color: #5AF; color: #5AF; }
-.buffer-tag.history { border-color: #F85; color: #F85; }
+.buffer-tag b {
+    color: #888;
+}
+.buffer-tag.active {
+    border-color: #5af;
+    color: #5af;
+}
+.buffer-tag.history {
+    border-color: #f85;
+    color: #f85;
+}
 
 /* ── Feedback Loop Circular Arrow ─────────────────────────────────────── */
 
@@ -465,14 +503,16 @@ input.advanced
 
 .feedback-path {
     fill: none;
-    stroke: #F85;
+    stroke: #f85;
     stroke-width: 2;
     stroke-dasharray: 5, 5;
     animation: dashOffset 1s infinite linear;
 }
 
 @keyframes dashOffset {
-    to { stroke-dashoffset: -10; }
+    to {
+        stroke-dashoffset: -10;
+    }
 }
 
 .copy-btn {
@@ -491,14 +531,28 @@ input.advanced
 
 .copy-btn:hover {
     background: rgba(90, 175, 255, 0.2);
-    color: #5AF;
-    border-color: #5AF;
+    color: #5af;
+    border-color: #5af;
 }
 
 /* Syntax Highlighting Colors (Basic) */
-.sh-keyword { color: #f92672; font-weight: bold; } /* flow control, precision */
-.sh-type    { color: #66d9ef; } /* vec3, float, sampler2D */
-.sh-func    { color: #a6e22e; } /* main, texture2D, mix */
-.sh-uniform { color: #fd971f; } /* iTime, iResolution */
-.sh-comment { color: #75715e; font-style: italic; }
-.sh-number  { color: #ae81ff; }
+.sh-keyword {
+    color: #f92672;
+    font-weight: bold;
+} /* flow control, precision */
+.sh-type {
+    color: #66d9ef;
+} /* vec3, float, sampler2D */
+.sh-func {
+    color: #a6e22e;
+} /* main, texture2D, mix */
+.sh-uniform {
+    color: #fd971f;
+} /* iTime, iResolution */
+.sh-comment {
+    color: #75715e;
+    font-style: italic;
+}
+.sh-number {
+    color: #ae81ff;
+}
