@@ -90,7 +90,7 @@ export default {
                         ref="canvasMain"
                         id="canvas_main"
                         width="1080"
-                        height="1920"
+                        height="1080"
                         style={{
                             width: state.satelliteMode ? '100vw' : canvasStyle.width,
                             height: state.satelliteMode ? '100vh' : canvasStyle.height,

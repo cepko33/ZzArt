@@ -54,7 +54,7 @@ export const state = reactive({
         index: 0,
         canvasWidth: 0,
         canvasHeight: 0,
-        clearOnChange: true,
+        clearOnChange: false,
         locked: false,
         compositeProgram: null,
     },
@@ -81,6 +81,9 @@ export const state = reactive({
         textareaCode: '',
         textareaJson: '',
     },
+
+    // Post-processing filter library
+    postProcessFunctions: [],
 });
 
 // Legacy mapping for compatibility with existing modules during transition

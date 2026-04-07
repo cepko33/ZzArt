@@ -1,5 +1,5 @@
 import { state } from './state';
-import { buildCompositeShader } from './shader/CompositeShader';
+import { buildCompositeShader, buildPostProcessShader } from './shader/CompositeShader';
 
 const programCache = {};
 
@@ -132,13 +132,20 @@ export function RenderShader(code, feedbackOpts) {
     if (!state.vertexShader) return;
 
     let x = state.contexts.shader;
+    let isPreview = feedbackOpts && feedbackOpts.isPreview;
+    let gridScale = feedbackOpts && feedbackOpts.gridScale;
     let w = state.canvas_shader.width;
     let h = state.canvas_shader.height;
+
+    if (isPreview && gridScale) {
+        w = Math.max(1, Math.floor(w * gridScale));
+        h = Math.max(1, Math.floor(h * gridScale));
+    }
 
     // ── Build and cache the mainImage program ────────────────────────────────
     let mainSrc =
         'precision mediump float;' +
-        `const vec3 iResolution = vec3(${w},${h},0.);` +
+        `uniform vec3 iResolution;` +
         `uniform float iTime;` +
         code +
         `\nvoid main(){mainImage(gl_FragColor,gl_FragCoord.xy);}`;
@@ -174,6 +181,7 @@ export function RenderShader(code, feedbackOpts) {
         x.bindFramebuffer(x.FRAMEBUFFER, state.feedback.framebuffers[rawIdx]);
         x.viewport(0, 0, w, h);
         x.useProgram(mainProg);
+        x.uniform3f(x.getUniformLocation(mainProg, 'iResolution'), w, h, 0);
         x.uniform1f(x.getUniformLocation(mainProg, 'iTime'), state.time);
         x.drawArrays(x.TRIANGLE_FAN, 0, 3);
 
@@ -185,8 +193,7 @@ export function RenderShader(code, feedbackOpts) {
             feedbackOpts.feedbackOpOrder ?? 0,
             feedbackOpts.feedbackSharpen ?? 0,
             feedbackOpts.feedbackBlur ?? 0,
-            w,
-            h
+            feedbackOpts.preFilters || []
         );
         let compProg = _getOrCreateProgram(x, compSrc);
         if (!compProg) return;
@@ -226,28 +233,69 @@ export function RenderShader(code, feedbackOpts) {
             feedbackOpts.chromaSoftness ?? 0.1
         );
         x.uniform1i(x.getUniformLocation(compProg, 'iChromaMode'), feedbackOpts.chromaMode ?? 0);
+        x.uniform3f(x.getUniformLocation(compProg, 'iResolution'), w, h, 0);
 
         x.drawArrays(x.TRIANGLE_FAN, 0, 3);
 
-        // ── Pass 3: blit comp result to canvas ───────────────────────────────
+        // ── Pass 3: blit comp result to canvas (with postFilters) ────────────
         x.bindFramebuffer(x.FRAMEBUFFER, null);
         x.viewport(0, 0, w, h);
 
-        const blitFullSrc = `precision mediump float;uniform sampler2D iChannel0;const vec2 iResolution=vec2(${w},${h});void main(){gl_FragColor=texture2D(iChannel0,gl_FragCoord.xy/iResolution);}`;
-        let blitProg = _getOrCreateProgram(x, blitFullSrc);
+        let blitSrc;
+        const postFilters = isPreview ? [] : (feedbackOpts.postFilters || []);
+        if (postFilters.length > 0) {
+            blitSrc = buildPostProcessShader(postFilters);
+        } else {
+            blitSrc = `precision mediump float;uniform sampler2D iChannel0;uniform vec3 iResolution;void main(){gl_FragColor=texture2D(iChannel0,gl_FragCoord.xy/iResolution.xy);}`;
+        }
+
+        let blitProg = _getOrCreateProgram(x, blitSrc);
+        if (!blitProg) return;
         x.useProgram(blitProg);
         x.activeTexture(x.TEXTURE0);
         x.bindTexture(x.TEXTURE_2D, state.feedback.textures[nextIdx]);
         x.uniform1i(x.getUniformLocation(blitProg, 'iChannel0'), 0);
+        x.uniform3f(x.getUniformLocation(blitProg, 'iResolution'), w, h, 0);
+        x.uniform1f(x.getUniformLocation(blitProg, 'iTime'), state.time);
         x.drawArrays(x.TRIANGLE_FAN, 0, 3);
 
         state.feedback.index = nextIdx;
     } else {
-        // ── Single-pass (no feedback): render directly to canvas ─────────────
-        x.bindFramebuffer(x.FRAMEBUFFER, null);
-        x.viewport(0, 0, w, h);
-        x.useProgram(mainProg);
-        x.uniform1f(x.getUniformLocation(mainProg, 'iTime'), state.time);
-        x.drawArrays(x.TRIANGLE_FAN, 0, 3);
+        const postFilters = isPreview ? [] : ((feedbackOpts && feedbackOpts.postFilters) || []);
+        if (postFilters.length > 0) {
+            // Need a temp buffer for post-processing if no feedback is used
+            if (w !== state.feedback.canvasWidth || h !== state.feedback.canvasHeight) {
+                InitFeedbackBuffers();
+            }
+            // Render mainImage to rawIdx 0
+            x.bindFramebuffer(x.FRAMEBUFFER, state.feedback.framebuffers[0]);
+            x.viewport(0, 0, w, h);
+            x.useProgram(mainProg);
+            x.uniform3f(x.getUniformLocation(mainProg, 'iResolution'), w, h, 0);
+            x.uniform1f(x.getUniformLocation(mainProg, 'iTime'), state.time);
+            x.drawArrays(x.TRIANGLE_FAN, 0, 3);
+
+            // Blit with post filters
+            x.bindFramebuffer(x.FRAMEBUFFER, null);
+            x.viewport(0, 0, w, h);
+            const blitSrc = buildPostProcessShader(postFilters);
+            let blitProg = _getOrCreateProgram(x, blitSrc);
+            if (!blitProg) return;
+            x.useProgram(blitProg);
+            x.activeTexture(x.TEXTURE0);
+            x.bindTexture(x.TEXTURE_2D, state.feedback.textures[0]);
+            x.uniform1i(x.getUniformLocation(blitProg, 'iChannel0'), 0);
+            x.uniform3f(x.getUniformLocation(blitProg, 'iResolution'), w, h, 0);
+            x.uniform1f(x.getUniformLocation(blitProg, 'iTime'), state.time);
+            x.drawArrays(x.TRIANGLE_FAN, 0, 3);
+        } else {
+            // ── Single-pass (no feedback, no postfilters): render directly to canvas ──
+            x.bindFramebuffer(x.FRAMEBUFFER, null);
+            x.viewport(0, 0, w, h);
+            x.useProgram(mainProg);
+            x.uniform3f(x.getUniformLocation(mainProg, 'iResolution'), w, h, 0);
+            x.uniform1f(x.getUniformLocation(mainProg, 'iTime'), state.time);
+            x.drawArrays(x.TRIANGLE_FAN, 0, 3);
+        }
     }
 }

@@ -6,6 +6,8 @@
  * with the previous frame's history, often with UV distortion.
  */
 
+import { state } from '../state';
+
 function _clamp(v, lo, hi) {
     return v < lo ? lo : v > hi ? hi : v;
 }
@@ -19,6 +21,7 @@ function _clamp(v, lo, hi) {
  * @param {number} opOrder    0–5   how mask and modulation are cross-wired
  * @param {number} sharpen    0-1   sharpen amount
  * @param {number} blur       0-1   blur amount
+ * @param {Array}  preFilters Array of {name, params}
  * @param {number} width      canvas width
  * @param {number} height     canvas height
  * @returns {string}  Complete GLSL source for the composite fragment shader
@@ -30,11 +33,12 @@ export function buildCompositeShader(
     opOrder,
     sharpen,
     blur,
-    width,
-    height
+    preFilters
 ) {
     const sNum = Number(sharpen) || 0;
     const bNum = Number(blur) || 0;
+
+    const filterCode = buildFilterChain(preFilters || [], 'iCurrent');
 
     // ── Blend sub-expression (uses curr, prev, alpha already declared) ────────
     const blendExprs = [
@@ -79,6 +83,9 @@ export function buildCompositeShader(
         /* 0 Standard: mod UV → sample → mask(curr) → blend */
         `  ${mk('mod_a')}
   vec4 curr = texture2D(iCurrent, uv);
+  #ifdef PREPROCESS
+  ${filterCode} // Applies to curr
+  #endif
   vec4 prev = texture2D(iPrevious, clamp(uvp,0.,1.));
   float mask = ${maskExpr};
   float alpha = iFeedbackAmount * mask;
@@ -86,6 +93,9 @@ export function buildCompositeShader(
 
         /* 1 Mask-gate: mask(curr) first → gates mod_a → mod UV → sample → blend */
         `  vec4 curr = texture2D(iCurrent, uv);
+  #ifdef PREPROCESS
+  ${filterCode}
+  #endif
   vec4 prev0 = texture2D(iPrevious, uv);
   float mask0 = ${maskExpr.replace(/\bprev\b/g, 'prev0')};
   float gated_a = mod_a * mask0;
@@ -97,6 +107,9 @@ export function buildCompositeShader(
 
         /* 2 Inv-gate: (1-mask) gates mod_a → stronger warping in dark/low areas */
         `  vec4 curr = texture2D(iCurrent, uv);
+  #ifdef PREPROCESS
+  ${filterCode}
+  #endif
   vec4 prev0 = texture2D(iPrevious, uv);
   float mask0 = ${maskExpr.replace(/\bprev\b/g, 'prev0')};
   float inv_a = mod_a * (1.0 - mask0);
@@ -109,6 +122,9 @@ export function buildCompositeShader(
         /* 3 Warp-then-mask: mod UV → sample warped prev → mask compares curr vs warped prev */
         `  ${mk('mod_a')}
   vec4 curr = texture2D(iCurrent, uv);
+  #ifdef PREPROCESS
+  ${filterCode}
+  #endif
   vec4 prev = texture2D(iPrevious, clamp(uvp,0.,1.));
   float mask = ${maskExpr};
   float alpha = iFeedbackAmount * mask;
@@ -116,6 +132,9 @@ export function buildCompositeShader(
 
         /* 4 Mask-steers-UV: mask from curr biases the UV warp direction toward bright pixels */
         `  vec4 curr = texture2D(iCurrent, uv);
+  #ifdef PREPROCESS
+  ${filterCode}
+  #endif
   float lx = dot(texture2D(iCurrent,uv+vec2(dx,0.)).rgb,vec3(.299,.587,.114));
   float rx = dot(texture2D(iCurrent,uv-vec2(dx,0.)).rgb,vec3(.299,.587,.114));
   float ly = dot(texture2D(iCurrent,uv+vec2(0.,dy)).rgb,vec3(.299,.587,.114));
@@ -135,6 +154,9 @@ export function buildCompositeShader(
   float traded_mod   = mod_a * (1.0 + iFeedbackAmount * 0.5);
   ${mk('traded_mod')}
   vec4 curr = texture2D(iCurrent, uv);
+  #ifdef PREPROCESS
+  ${filterCode}
+  #endif
   vec4 prev = texture2D(iPrevious, clamp(uvp,0.,1.));
   float mask = ${maskExpr};
   float alpha = traded_blend * mask;
@@ -153,6 +175,10 @@ uniform vec3  iChromaKeyColor;
 uniform float iChromaThreshold;
 uniform float iChromaSoftness;
 uniform int   iChromaMode;
+uniform vec3  iResolution;
+
+// Library functions injected here
+${state.postProcessFunctions.map((f) => f.body).join('\n')}
 
 vec3 rgb2hsv(vec3 c) {
   vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
@@ -184,9 +210,9 @@ float calcChroma(vec3 col, vec3 key, float threshold, float softness, int mode) 
 }
 
 void main(){
-  vec2 uv = gl_FragCoord.xy / vec2(${width}.0, ${height}.0);
-  float dx = 1.0 / ${width}.0;
-  float dy = 1.0 / ${height}.0;
+  vec2 uv = gl_FragCoord.xy / iResolution.xy;
+  float dx = 1.0 / iResolution.x;
+  float dy = 1.0 / iResolution.y;
   float mod_a = iFeedbackModAmount;
 ${body}
   
@@ -208,5 +234,62 @@ ${body}
       r.rgb = mix(r.rgb, b.rgb * 0.25, ${bNum.toFixed(3)});
       gl_FragColor = r;
   }
+}`;
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function buildFilterChain(filters, samplerName) {
+    if (!filters || filters.length === 0) return '';
+    let glsl = '';
+    for (const f of filters) {
+        const fdef = state.postProcessFunctions.find((pf) => pf.name === f.name);
+        if (!fdef) continue;
+
+        // Detect parameter signature from body (naive but effective for our library)
+        const hasTexture = fdef.body.includes('sampler2D tex');
+        const hasUV = fdef.body.includes('vec2 uv');
+
+        let args = 'curr';
+        if (hasTexture) args += ', ' + samplerName;
+        if (hasUV) args += ', uv';
+
+        // Add custom params
+        for (const key in f.params) {
+            const val = f.params[key];
+            if (typeof val === 'number' || (typeof val === 'string' && !isNaN(parseFloat(val)))) {
+                args += ', ' + parseFloat(val).toFixed(4);
+            } else if (val && typeof val === 'object' && val.x !== undefined) {
+                const vx = parseFloat(val.x) || 0;
+                const vy = parseFloat(val.y) || 0;
+                if (val.z !== undefined) {
+                    const vz = parseFloat(val.z) || 0;
+                    args += ', vec3(' + vx.toFixed(4) + ',' + vy.toFixed(4) + ',' + vz.toFixed(4) + ')';
+                } else {
+                    args += ', vec2(' + vx.toFixed(4) + ',' + vy.toFixed(4) + ')';
+                }
+            }
+        }
+
+        glsl += '  curr = ' + f.name + '(' + args + ');\n';
+    }
+    return '#define PREPROCESS\n' + glsl;
+}
+
+export function buildPostProcessShader(filters) {
+    const filterCode = buildFilterChain(filters || [], 'iChannel0');
+    return `precision mediump float;
+uniform sampler2D iChannel0;
+uniform float iTime;
+uniform vec3 iResolution;
+
+// Library functions injected here
+${state.postProcessFunctions.map((f) => f.body).join('\n')}
+
+void main() {
+  vec2 uv = gl_FragCoord.xy / iResolution.xy;
+  vec4 curr = texture2D(iChannel0, uv);
+${filterCode}
+  gl_FragColor = curr;
 }`;
 }

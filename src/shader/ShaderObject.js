@@ -48,6 +48,10 @@ export class ShaderObject {
         this.chromaKeyColor = new Vector3(0, 1, 0); // Default to green
         this.chromaThreshold = 0.1;
         this.chromaSoftness = 0.1;
+
+        // Post-processing stacks
+        this.preFilters = [];
+        this.postFilters = [];
     }
 
     SetGridPos(X, Y) {
@@ -116,7 +120,71 @@ export class ShaderObject {
             }
         }
 
+        this.preFilters = [];
+        this.postFilters = [];
+        this._randomizeFilters(this.preFilters);
+        this._randomizeFilters(this.postFilters);
+
         this.MakeAllObjectFloatsFixed(this);
+    }
+
+    _randomizeFilters(stack) {
+        if (Rand() < 0.15) {
+            const count = RandInt(3);
+            for (let i = 0; i < count; i++) {
+                const f =
+                    state.postProcessFunctions[RandInt(state.postProcessFunctions.length)];
+                stack.push({
+                    name: f.name,
+                    params: this._generateDefaultParams(f.name),
+                    enabled: true,
+                });
+            }
+        }
+    }
+
+    _generateDefaultParams(name) {
+        if (name === 'FilterRGBShift') return { offset: { x: RandBetween(-0.05, 0.05), y: RandBetween(-0.05, 0.05) } };
+        if (name === 'FilterColorBalance') return { rgb: { x: RandBetween(0.8, 1.2), y: RandBetween(0.8, 1.2), z: RandBetween(0.8, 1.2) } };
+        if (name === 'FilterDuotone') return {
+            col1: { x: RandBetween(0, 0.5), y: RandBetween(0, 0.5), z: RandBetween(0, 0.5) },
+            col2: { x: RandBetween(0.5, 1.0), y: RandBetween(0.5, 1.0), z: RandBetween(0.5, 1.0) }
+        };
+        if (name === 'FilterVignette') return { radius: RandBetween(0.5, 0.9), softness: RandBetween(0.1, 0.5) };
+        if (name === 'FilterPosterize') return { levels: RandBetween(2, 10) };
+        if (name === 'FilterBrightness') return { amount: RandBetween(-0.2, 0.2) };
+        if (name === 'FilterContrast') return { amount: RandBetween(0.8, 1.5) };
+        if (name === 'FilterSaturation') return { amount: RandBetween(0.0, 2.0) };
+        if (name === 'FilterHueShift') return { shift: Rand() };
+        if (name === 'FilterBlur') return { radius: RandBetween(1, 5) };
+        if (name === 'FilterSharpen') return { strength: RandBetween(0.1, 1.0) };
+        if (name === 'FilterPixelate') return { size: RandBetween(2, 16) };
+        if (name === 'FilterChromaticAberration') return { strength: RandBetween(0.1, 2.0) };
+        if (name === 'FilterBloom') return { threshold: RandBetween(0.5, 0.9), strength: RandBetween(0.2, 1.0) };
+        if (name === 'FilterFilmGrain') return { intensity: RandBetween(0.05, 0.2) };
+        if (name === 'FilterEdgeDetection') return { strength: RandBetween(1.0, 5.0) };
+        if (name === 'FilterGlitch') return { intensity: RandBetween(0.05, 0.3) };
+        if (name === 'FilterCRT') return { bend: RandBetween(0.05, 0.2), scanline: RandBetween(0.1, 0.3) };
+        if (name === 'FilterScanlines') return { freq: RandBetween(100, 300), amount: RandBetween(0.1, 0.3) };
+        if (name === 'FilterTiltShift') return { center: RandBetween(0.3, 0.7), width: RandBetween(0.1, 0.3), strength: RandBetween(0.3, 0.8) };
+        if (name === 'FilterKaleidoscope') return { segments: RandInt(3, 8) };
+        if (name === 'FilterMirror') return { axis: Rand() > 0.5 ? 1.0 : 0.0 };
+        if (name === 'FilterNightVision') return { intensity: RandBetween(0.5, 1.0) };
+        if (name === 'FilterHalftone') return { size: RandBetween(5, 15) };
+        if (name === 'FilterBleachBypass') return { amount: RandBetween(0.3, 0.8) };
+        if (name === 'FilterDither') return { amount: RandBetween(0.02, 0.1) };
+        if (name === 'FilterRadialBlur') return { strength: RandBetween(0.2, 1.0) };
+        if (name === 'FilterSepia') return { amount: RandBetween(0.5, 1.0) };
+        if (name === 'FilterInverse') return { amount: RandBetween(0.8, 1.0) };
+        if (name === 'FilterGrayscale') return { amount: RandBetween(0.8, 1.0) };
+        if (name === 'FilterThreshold') return { threshold: RandBetween(0.3, 0.7) };
+        if (name === 'FilterSolarize') return { threshold: RandBetween(0.3, 0.7) };
+        if (name === 'FilterExposure') return { exposure: RandBetween(-1.0, 1.0) };
+        if (name === 'FilterGamma') return { gamma: RandBetween(0.5, 2.0) };
+
+        if (name === 'FilterLomo' || name === 'FilterThermal' || name === 'FilterTechnicolor') return {};
+
+        return { amount: RandBetween(0.1, 1.0) };
     }
 
     Clone() {
@@ -128,6 +196,15 @@ export class ShaderObject {
         for (let color of this.paletteColors)
             clone.paletteColors.push(Object.assign(new Vector3(), color));
         clone.chromaKeyColor = Object.assign(new Vector3(), this.chromaKeyColor);
+
+        clone.preFilters = this.preFilters.map((f) => ({
+            ...f,
+            params: { ...f.params },
+        }));
+        clone.postFilters = this.postFilters.map((f) => ({
+            ...f,
+            params: { ...f.params },
+        }));
 
         // fix old shaders that had too high iterations
         clone.iterationCount = Clamp(parseInt(clone.iterationCount), 1, state.maxIterations);
@@ -247,7 +324,39 @@ export class ShaderObject {
             }
         }
 
+        this._mutateFilters(this.preFilters);
+        this._mutateFilters(this.postFilters);
+
         this.MakeAllObjectFloatsFixed(this);
+    }
+
+    _mutateFilters(stack) {
+        if (Rand() < 0.1) {
+            const f = state.postProcessFunctions[RandInt(state.postProcessFunctions.length)];
+            stack.push({
+                name: f.name,
+                params: this._generateDefaultParams(f.name),
+                enabled: true,
+            });
+        }
+        if (stack.length > 0 && Rand() < 0.1) {
+            stack.splice(RandInt(stack.length), 1);
+        }
+        for (const filter of stack) {
+            if (Rand() < 0.1) filter.enabled = !filter.enabled;
+            if (Rand() < 0.4) {
+                for (const key in filter.params) {
+                    const val = filter.params[key];
+                    if (typeof val === 'number') {
+                        filter.params[key] += RandBetween(-0.05, 0.05);
+                    } else if (val && typeof val.x === 'number') {
+                        val.x += RandBetween(-0.05, 0.05);
+                        val.y += RandBetween(-0.05, 0.05);
+                        if (typeof val.z === 'number') val.z += RandBetween(-0.05, 0.05);
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -330,16 +439,12 @@ export class ShaderObject {
         }
     }
 
-    /**
-     * Render this shader.
-     * @param {boolean} [withFeedback=false]  When true, passes feedback
-     *   options to RenderShader so the two-pass composite path is used.
-     *   Grid / thumbnail renders always skip feedback.
-     */
-    Render(withFeedback = false) {
+    Render(withFeedback = false, isPreview = false, gridScale = null) {
         let code = this.GetCode();
         if (withFeedback && this.useFeedback) {
             RenderShader(code, {
+                isPreview,
+                gridScale,
                 useFeedback: true,
                 feedbackBlendMode: this.feedbackBlendMode ?? 0,
                 feedbackAmount: this.feedbackAmount ?? 0.92,
@@ -354,9 +459,16 @@ export class ShaderObject {
                 chromaThreshold: this.chromaThreshold ?? 0.1,
                 chromaSoftness: this.chromaSoftness ?? 0.1,
                 chromaMode: this.chromaMode ?? 0,
+                preFilters: this.preFilters.filter((f) => f.enabled),
+                postFilters: this.postFilters.filter((f) => f.enabled),
             });
         } else {
-            RenderShader(code);
+            RenderShader(code, {
+                isPreview,
+                gridScale,
+                preFilters: this.preFilters.filter((f) => f.enabled),
+                postFilters: this.postFilters.filter((f) => f.enabled),
+            });
         }
     }
 

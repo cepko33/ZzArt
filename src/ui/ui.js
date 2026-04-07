@@ -418,29 +418,35 @@ function AnimateGridRender(renderId) {
     const W = (c.width - gap * (G + 1)) / G;
     const H = (c.height - gap * (G + 1)) / G;
 
-    for (let i = 0; i < 2; i++) {
-        if (state.gridRenderQueue.length > 0) {
-            const { x, y } = state.gridRenderQueue.shift();
-            const shader = state.shaderGrid[x][y];
+    const startPerf = performance.now();
 
-            state.canvas_shader.width = W;
-            state.canvas_shader.height = H;
+    while (state.gridRenderQueue.length > 0) {
+        // Yield if we've taken more than 16ms (roughly 1 frame budget) to avoid freezing UI
+        if (performance.now() - startPerf > 5) break;
 
-            if (shader.useFeedback) {
-                ClearFeedback();
-                for (let j = 0; j < 2; j++) shader.Render(true);
-            } else {
-                shader.Render();
-            }
+        const { x, y } = state.gridRenderQueue.shift();
+        const shader = state.shaderGrid[x][y];
 
-            const record = state.gridRenderRecords.find((r) => r.x === x && r.y === y);
-            if (record) {
-                record.canvas.width = W;
-                record.canvas.height = H;
-                const rCtx = record.canvas.getContext('2d');
-                rCtx.drawImage(state.canvas_shader, 0, 0, W, H);
-                record.rendered = true;
-            }
+        // Instead of resizing state.canvas_shader for every thumbnail,
+        // we just render into a viewport of the full-screen canvas.
+        const gridScale = 1;
+        const renderW = Math.max(1, Math.floor(W * gridScale));
+        const renderH = Math.max(1, Math.floor(H * gridScale)) - 60;
+
+        shader.Render(false, true, gridScale); // (withFeedback=false, isPreview=true, gridScale=0.5)
+
+        const record = state.gridRenderRecords.find((r) => r.x === x && r.y === y);
+        if (record) {
+            record.canvas.width = W;
+            record.canvas.height = H;
+            const rCtx = record.canvas.getContext('2d');
+
+            // WebGL's gl.viewport(0,0,w,h) renders to the bottom-left corner of the canvas.
+            // In 2D Canvas space, Y=0 is the top. Thus, we copy from the bottom-left.
+            const sx = 0;
+            const sy = state.canvas_shader.height - renderH;
+            rCtx.drawImage(state.canvas_shader, sx, sy, renderW, renderH, 0, 0, W, H);
+            record.rendered = true;
         }
     }
 

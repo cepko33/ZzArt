@@ -6,6 +6,7 @@ import { RenderingPipeline } from './Advanced/RenderingPipeline';
 import { GeneralSettings } from './Advanced/GeneralSettings';
 import { SavedShaders } from './Advanced/SavedShaders';
 import { FeedbackSettings } from './Advanced/FeedbackSettings';
+import { FilterStack } from './Advanced/FilterStack';
 
 export default {
     setup() {
@@ -26,6 +27,7 @@ export default {
                 fs.feedbackOpOrder ?? 0,
                 fs.feedbackSharpen ?? 0,
                 fs.feedbackBlur ?? 0,
+                fs.preFilters || [],
                 w,
                 h
             );
@@ -79,6 +81,8 @@ export default {
 
                     <div class="advanced-column controls-column">
                         <FeedbackSettings v-model:chromaKeyHex={this.chromaKeyHex} />
+                        <FilterStack title="Pre-Process" stack={state.favoriteShader.preFilters} />
+                        <FilterStack title="Post-Process" stack={state.favoriteShader.postFilters} />
                         <GeneralSettings>
                             <SavedShaders />
                         </GeneralSettings>

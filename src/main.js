@@ -3,6 +3,7 @@ import App from './App.jsx';
 import { state } from './state';
 import { InitWebgl } from './webgl';
 import { ShaderObject } from './shader/ShaderObject';
+import { POSTPROCESS_FUNCTIONS } from './shader/lib/postprocess';
 import { LoadLocalStorage, LoadSavedShaderList, LoadSettingsFromCookie } from './storage';
 import {
     InitSatelliteMode,
@@ -50,6 +51,7 @@ async function InitApp() {
         state.satelliteMode = parseInt(searchParams.get('satellite'));
 
     state.uniqueID = RandSeeded();
+    state.postProcessFunctions = POSTPROCESS_FUNCTIONS;
     InitWebgl();
     state.shaderMemory.push(new ShaderObject());
 

@@ -556,3 +556,111 @@ input.advanced {
 .sh-number {
     color: #ae81ff;
 }
+
+/* ── Filter Stack UI ─────────────────────────────────────────────────── */
+.filter-stack .filter-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 5px 0;
+}
+
+.filter-item {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    padding: 10px;
+    transition: all 0.2s;
+}
+
+.filter-item.disabled {
+    opacity: 0.5;
+    background: transparent;
+}
+
+.filter-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 5px;
+}
+
+.filter-name {
+    flex-grow: 1;
+    font-weight: bold;
+    font-size: 14px;
+    color: #fff;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.filter-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.filter-actions button {
+    font-size: 12px;
+    padding: 2px 6px;
+    margin: 0;
+    min-width: 24px;
+    height: 24px;
+    background: #333;
+    color: #aaa;
+    border: 1px solid #444;
+    border-radius: 4px;
+    cursor: pointer;
+    vertical-align: middle;
+}
+
+.filter-actions button:hover {
+    background: #444;
+    color: #fff;
+    border-color: #5af;
+}
+
+.filter-actions .btn-remove {
+    color: #f66;
+    font-weight: bold;
+}
+
+.filter-actions .btn-remove:hover {
+    background: #522;
+    border-color: #f66;
+}
+
+.filter-params {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.add-filter {
+    margin-top: 15px;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.add-filter select {
+    width: 100%;
+    background: #111;
+    border: 1px dashed #444;
+    color: #5af;
+    cursor: pointer;
+    text-align: center;
+    padding: 8px;
+    transition: all 0.2s;
+}
+
+.add-filter select:hover {
+    background: #1a1a1a;
+    border-color: #5af;
+    color: #fff;
+}
+
+.color-preview {
+    width: 20px;
+    height: 20px;
+    border: 1px solid #fff;
+    border-radius: 2px;
+}
