@@ -1,4 +1,5 @@
 # 𝓩𝔃𝓐𝓻𝓽 - Abstract Art Evolution
+
 By Frank Force 2019
 
 # [TRY THE LIVE DEMO!](http://zzart.3d2k.com)
@@ -40,4 +41,4 @@ By Frank Force 2019
 ![Example](/examples/7.png)
 ![Example](/examples/8.png)
 
-![ZzFX Image](/favicon.png) 
+![ZzFX Image](/favicon.png)
